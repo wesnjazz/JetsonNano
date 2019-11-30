@@ -79,7 +79,7 @@ void setup() {
 void loop() {
   checkResetSignal();
   printSerial();
-  delay(50);
+  delay(75);
 }
 
 void EncoderInit() {
@@ -103,6 +103,7 @@ void checkResetSignal() {
         Serial.read();
         delay(1);
       }
+      delay(100);
     }
   }
 }
