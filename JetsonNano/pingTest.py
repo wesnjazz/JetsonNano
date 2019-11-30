@@ -2,7 +2,7 @@
 import serial
 from time import sleep
 
-port="/dev/ttyACM1"
+port="/dev/ttyACM0"
 rate=9600
 
 s1 = serial.Serial(port, rate)

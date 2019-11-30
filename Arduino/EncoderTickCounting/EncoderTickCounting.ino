@@ -99,7 +99,7 @@ void wheelR() {
   }
 
   encoder_count_right += lookup_table[currentR];
-  Serial.print("Rwheel: ");
+  Serial.print("R wheel: ");
   Serial.println(encoder_count_right);
 }
   
@@ -113,6 +113,6 @@ void wheelL() {
   }
 
   encoder_count_left -= lookup_table[currentL];
-  Serial.print("Lwheel: ");
+  Serial.print("L wheel: ");
   Serial.println(encoder_count_left);
 }
