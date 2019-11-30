@@ -1,8 +1,3 @@
-// ToDo:
-// This code has a problem sending two interrupts results t
-// hrough the serial
-
-
 /***
  * 2019.11.29.Fri
  * 
@@ -77,12 +72,14 @@ long encoder_count_right = 0;
 long encoder_count_left = 0;
 
 void setup() {
-  Serial.begin(57600);
+  Serial.begin(9600);
   EncoderInit();
 }
 
-
 void loop() {
+  checkResetSignal();
+  printSerial();
+  delay(50);
 }
 
 void EncoderInit() {
@@ -92,6 +89,22 @@ void EncoderInit() {
                   wheelR,CHANGE);
   attachInterrupt(digitalPinToInterrupt(encoderLpinB),
                   wheelL,CHANGE);
+}
+
+void checkResetSignal() {
+  if (Serial.available() > 0) {
+    char c = Serial.read();
+    if (c == 'r') {
+      // Reset encoder counter
+      encoder_count_right = 0;
+      encoder_count_left = 0;
+      // Clear all the remaining buffer
+      while (Serial.available() > 0) {
+        Serial.read();
+        delay(1);
+      }
+    }
+  }
 }
 
 void wheelR() {
@@ -104,8 +117,6 @@ void wheelR() {
   }
 
   encoder_count_right += lookup_table[currentR];
-  Serial.print("R wheel: ");
-  Serial.println(encoder_count_right);
 }
   
 void wheelL() {
@@ -118,6 +129,17 @@ void wheelL() {
   }
 
   encoder_count_left -= lookup_table[currentL];
-  Serial.print("L wheel: ");
+}
+
+void printSerial() {
+  Serial.print(encoder_count_right);
+  Serial.print(",");
   Serial.println(encoder_count_left);
+
+// To minimize delay with several Serial.print,
+// Sting class is used.
+// But, it turns out using Serial.print is fine.
+//  String ticks = String(encoder_count_right) +
+//                 "," + String(encoder_count_left) + "\r\n";
+//  Serial.print(ticks);
 }
