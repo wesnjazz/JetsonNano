@@ -1,0 +1,22 @@
+Class Khan():
+    self.driver()
+        - drive the robot
+    self.image_handler()
+        - capture_manager()
+            - capturing image from camera
+        - ROI_manager()
+            - identify ROI from the captured image
+    self.PWM_manager()
+        - calculate PWM based on errors
+    self.encoder_path_follower()
+        - path follower with odometry using encoders
+    self.visual_path_follower()
+        - path follower using visual sensors
+    self.path_manager()
+        - input paths and output sequence of the path
+    self.object_detector()
+        - detect external object to avoid collision
+    self.cruise_controller() ?? Do I need it? I have a PWM_manager()
+        -
+    self.serial_communicator()
+        - communicate with arduino through serial port
