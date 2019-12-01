@@ -22,23 +22,46 @@ lastRtick = 0
 lastLtick = 0
 
 def read_serial():
-    global lastRtick, lastLtick
+    global lastLtick, lastRtick
     r = s1.readline()
     line = r.decode('utf-8').split(",")
     if len(line) >= 2:
         # print(line)
         for i in range(0, len(line)): line[i] = int(line[i])
-        print("R:{} L:{}".format(line[0], line[1]))
-        lastRtick = line[0]
+        print("L:{} R:{}".format(line[1], line[0]))
         lastLtick = line[1]
-        return line[0], line[1]
+        lastRtick = line[0]
+        return line[1], line[0]
     else:
-        print("\tLast R:{} L:{}".format(lastRtick, lastLtick))
-        return lastRtick, lastLtick
+        print("\tLast L:{} R:{}".format(lastLtick, lastRtick))
+        return lastLtick, lastRtick
 
 def reset_ticks():
     s1.write(b'r')
     sleep(1.5)
+
+def getAngle(l_ticks, r_ticks, one_cm_per_tick=0.0107, wheel_base=11.3):
+    delta_l = one_cm_per_tick * l_ticks
+    delta_r = one_cm_per_tick * r_ticks
+    delta_s = (delta_r - delta_l) / 2.0
+    delta_theta = delta_s / (wheel_base / 2.0)
+    delta_theta_in_radian = delta_s / (wheel_base / 2.0)
+    delta_theta_in_degree = (180.0 / math.pi) * delta_theta
+    return delta_theta_in_degree
+
+def getRefPositionXY_atTimeT(t, speed, theta):
+    traveledX_atTimeT = t * speed
+    xRef = traveledX_atTimeT * math.cos(theta)
+    yRef = traveledX_atTimeT * math.sin(theta)
+    return xRef, yRef
+
+def getActPositionXY_atTimeT(current_x, delta_theta):
+    xAct = current_x * math.cos(delta_theta)
+    yAct = current_x * math.sin(delta_theta)
+    return xAct, yAct
+
+# def speedToPWM(speed):
+
 
 def drive(ser, robot, r_speed, l_speed, distance):
     # number of ticks 't' to travel 'x' distance:
@@ -60,29 +83,35 @@ def drive(ser, robot, r_speed, l_speed, distance):
 
     '''
     ToDo:
-    - calculate error x, y, theta
+    - calculate error x, y, theta [theta done]
+    - map speed to PWM
+    
     '''
 
     one_cm_per_tick = 0.0106
     wheel_base = 11.3
+    start_time = time.time()
     while True:
-        r_tick, l_tick = read_serial()
-        delta_r = one_cm_per_tick * r_tick
-        delta_l = one_cm_per_tick * l_tick
-        delta_s = delta_r - delta_l
-        delta_theta = delta_s / wheel_base
-        delta_theta_in_degree = (360.0 * delta_theta) / (2 * math.pi)
-        print("deltaTheta:{}  degree:{}".format(delta_theta, delta_theta_in_degree))
+        l_ticks, r_ticks = read_serial()
+        delta_t = time.time() - start_time
+        # xRef, yRef = getRefPositionXY_atTimeT(delta_t, )
+
+        delta_theta = getAngle(l_ticks, r_ticks)
+        # xAct, yAct = getActPositionXY_atTimeT(delta_theta)
+
+        print("Goal:({:.3f},{:.3f},{:.3f}) \
+                Act:({:.3f},{:.3f},{:.3f})".format\
+                  (50, 0, 0, 0, 0, delta_theta))
 
         # PWM_L, PWM_R = PWM_manager()
         # robot.set_motors(PWM_L, PWM_R)
-        if r_tick >= ticks:
-            print("Right wheel reached {}. Goal was {}".format(r_tick, ticks))
+        if l_ticks >= ticks:
+            print(" Left wheel reached {}. Goal was {}".format(l_ticks, ticks))
             robot.stop()
             # sleep(.5)
             exit()
-        if l_tick >= ticks:
-            print(" Left wheel reached {}. Goal was {}".format(l_tick, ticks))
+        if r_ticks >= ticks:
+            print("Right wheel reached {}. Goal was {}".format(r_ticks, ticks))
             robot.stop()
             # sleep(.5)
             exit()
@@ -107,9 +136,9 @@ def main():
     print("import finished.")
     # sleep(2)
     robot = Robot()
-    l_speed = 0.18
+    l_speed = 0.3
     r_speed = 0.3
-    distance =50
+    distance = 50
     t1 = threading.Thread(target=drive, \
                           args=(s1, robot, l_speed, r_speed, distance))
     t1.start()
