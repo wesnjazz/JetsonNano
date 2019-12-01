@@ -49,6 +49,12 @@ def getAngle(l_ticks, r_ticks, one_cm_per_tick=0.0107, wheel_base=11.3):
     delta_theta_in_degree = (180.0 / math.pi) * delta_theta
     return delta_theta_in_degree
 
+def getDeltaXY(current_tick, last_tick, deltaTheta, one_cm_per_tick=0.0107):
+    delta_tick = current_tick - last_tick
+    return (delta_tick * one_cm_per_tick) * math.cos(deltaTheta), \
+            (delta_tick * one_cm_per_tick) * math.sin(deltaTheta)
+
+
 def getRefPositionXY_atTimeT(t, speed, theta):
     traveledX_atTimeT = t * speed
     xRef = traveledX_atTimeT * math.cos(theta)
@@ -91,30 +97,48 @@ def drive(ser, robot, r_speed, l_speed, distance):
     one_cm_per_tick = 0.0106
     wheel_base = 11.3
     start_time = time.time()
+    l_tick_last = 0
+    r_tick_last = 0
+    accumulatedX = 0
+    accumulatedY = 0
+    accumulatedTheta = 0
+    last_tick = 0
     while True:
-        l_ticks, r_ticks = read_serial()
+        l_tick, r_tick = read_serial()
+        delta_l_tick = l_tick_last - l_tick
+        delta_r_tick = r_tick_last - r_tick
+        current_tick = (r_tick + l_tick) // 2
+        deltaTheta = getAngle(delta_l_tick, delta_r_tick)
+        deltaX, deltaY = getDeltaXY(current_tick, last_tick, deltaTheta)
+        accumulatedX += deltaX
+        accumulatedY += deltaY
+        accumulatedTheta += deltaTheta
         delta_t = time.time() - start_time
         # xRef, yRef = getRefPositionXY_atTimeT(delta_t, )
 
-        delta_theta = getAngle(l_ticks, r_ticks)
+        current_theta = getAngle(l_tick, r_tick)
         # xAct, yAct = getActPositionXY_atTimeT(delta_theta)
 
         print("Goal:({:.3f},{:.3f},{:.3f}) \
-                Act:({:.3f},{:.3f},{:.3f})".format\
-                  (50, 0, 0, 0, 0, delta_theta))
+        Act:({:.3f},{:.3f},{:.3f})  RealTheta:{:.3f}".format\
+                  (50, 0, 0, accumulatedX, accumulatedY, accumulatedTheta, current_theta))
 
         # PWM_L, PWM_R = PWM_manager()
         # robot.set_motors(PWM_L, PWM_R)
-        if l_ticks >= ticks:
-            print(" Left wheel reached {}. Goal was {}".format(l_ticks, ticks))
+        l_tick_last = l_tick
+        r_tick_last = r_tick
+        last_tick = (r_tick_last + l_tick_last) // 2
+        if l_tick >= ticks:
+            print(" Left wheel reached {}. Goal was {}".format(l_tick, ticks))
             robot.stop()
             # sleep(.5)
             exit()
-        if r_ticks >= ticks:
-            print("Right wheel reached {}. Goal was {}".format(r_ticks, ticks))
+        if r_tick >= ticks:
+            print("Right wheel reached {}. Goal was {}".format(r_tick, ticks))
             robot.stop()
             # sleep(.5)
             exit()
+
 
 x = 100
 y = 0
