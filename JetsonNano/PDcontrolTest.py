@@ -104,7 +104,7 @@ def drive(ser, robot, l_speed, r_speed, distance):
     theta_ddot_last = 0
     l_speed_last = 0
     r_speed_last = 0
-    K = 2.0
+    K = 2.5
     B = 2.0
     # K = l_speed * 10
     # B = 5
@@ -204,7 +204,7 @@ def main():
     robot = Robot()
     l_speed = 0.55
     r_speed = 0.55
-    distance = 70
+    distance = 100
     t1 = threading.Thread(target=drive, \
                           args=(s1, robot, l_speed, r_speed, distance))
     t1.start()
