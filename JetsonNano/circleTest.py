@@ -158,7 +158,8 @@ def drive(ser, robot, l_speed, r_speed, distance):
         if abs(theta_ddot) > threshold:
             new_l_speed = l_speed
             new_r_speed = r_speed
-        robot.set_motors(new_l_speed, new_r_speed)
+        # robot.set_motors(new_l_speed, new_r_speed)
+        robot.set_motors(l_speed, r_speed)
 
         # l_speed_last = l_speed
         # r_speed_last = r_speed
@@ -187,8 +188,8 @@ def drive(ser, robot, l_speed, r_speed, distance):
             end = time.time()
             elapsed = end - start
             speed = 100.0 / elapsed
-            print("Traveled:{:0>3d}cm TimeElapsed:{:.3f} Speed:{:.3f} PWM(L,R):{:.3f},{:.3f}"\
-                .format(distance, elapsed, speed, l_speed, r_speed))
+            # print("Traveled:{:0>3d}cm TimeElapsed:{:.3f} Speed:{:.3f} PWM(L,R):{:.3f},{:.3f}"\
+            #     .format(distance, elapsed, speed, l_speed, r_speed))
             exit()
 
 x = 100
@@ -211,9 +212,11 @@ def main():
     print("import finished.")
     sleep(2)
     robot = Robot()
-    l_speed = 1.0
-    r_speed = 1.0
-    distance = 100
+    radius = 15.0
+    circumference = 2 * math.pi * radius
+    l_speed = 0.2
+    r_speed = 0.62
+    distance = circumference
     t1 = threading.Thread(target=drive, \
                           args=(s1, robot, l_speed, r_speed, distance))
     t1.start()
