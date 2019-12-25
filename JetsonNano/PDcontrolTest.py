@@ -40,10 +40,10 @@ def reset_ticks():
     s1.write(b'r')
     sleep(1.5)
 
-def getAngle(l_ticks, r_ticks, one_cm_per_tick=0.0107, wheel_base=11.3):
-    delta_l = one_cm_per_tick * l_ticks
-    delta_r = one_cm_per_tick * r_ticks
-    delta_s = (delta_l - delta_r) / 2.0
+def getAngle(delta_l, delta_r, one_cm_per_tick=0.0107, wheel_base=11.3):
+    delta_l_cm = one_cm_per_tick * l_ticks
+    delta_r_cm = one_cm_per_tick * r_ticks
+    delta_x_cm = (delta_r_cm - delta_l_cm) / 2.0
     delta_theta = delta_s / (wheel_base / 2.0)
     delta_theta_in_radian = delta_s / (wheel_base / 2.0)
     delta_theta_in_degree = (180.0 / math.pi) * delta_theta
@@ -118,7 +118,7 @@ def drive(ser, robot, l_speed, r_speed, distance):
         l_tick, r_tick = read_serial()
         delta_l_tick = l_tick_last - l_tick
         delta_r_tick = r_tick_last - r_tick
-        current_tick = (r_tick + l_tick) // 2
+        delta_x_tick = (r_tick + l_tick) // 2
         deltaTheta = getAngle(delta_l_tick, delta_r_tick)
         deltaX, deltaY = getDeltaXY(current_tick, last_tick, deltaTheta)
         accumulatedX += deltaX
