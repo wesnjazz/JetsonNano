@@ -27,7 +27,9 @@ class SerialCommunicator:
         except UnicodeDecodeError:
             print("UnicodeDecodeError")
             self.readlineDataDecoded = [self.lastTickLeft, self.lastTickRight]
-        if len(self.readlineDataDecoded) >= 2: # if serial data has both left/right ticks
+        # if serial data has both left/right ticks
+        if len(self.readlineDataDecoded) >= 2:
+            print("Serial data has Double DATA")
             for i in range(0, len(self.readlineDataDecoded)):
                 try:
                     self.readlineDataDecoded[i] = int(self.readlineDataDecoded[i])
@@ -38,6 +40,7 @@ class SerialCommunicator:
             self.lastTickRight = self.readlineDataDecoded[1]
             return self.readlineDataDecoded[0], self.readlineDataDecoded[1]
         else:
+            print("Serial data has only SINGLE DATA")
             return self.lastTickLeft, self.lastTickRight
 
     def resetTicks(self):
@@ -50,7 +53,7 @@ class SerialCommunicator:
         while True:
             try:
                 self.khani.tickLeft, self.khani.tickRight = self.readSerial()
-                # print("{},{}".format(self.khani.tickLeft, self.khani.tickRight))
+                print("{},{}".format(self.khani.tickLeft, self.khani.tickRight))
             except TypeError:
                 print("TypeError")
 
