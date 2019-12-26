@@ -1,4 +1,3 @@
-import serial
 import threading
 from jetbot import Robot
 from time import sleep
@@ -6,7 +5,7 @@ import argparse
 from imageHandler import ImageHandler
 from laneDetector import LaneDetector
 
-class Khan:
+class Khani:
     def __init__(self, serial_port, serial_rate):
         self.driver = None
         self.image_handler = None
