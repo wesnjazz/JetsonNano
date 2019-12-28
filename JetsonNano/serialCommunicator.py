@@ -29,7 +29,7 @@ class SerialCommunicator:
             self.readlineDataDecoded = [self.lastTickLeft, self.lastTickRight]
         # if serial data has both left/right ticks
         if len(self.readlineDataDecoded) >= 2:
-            print("Serial data has Double DATA")
+            # print("Serial data has Double DATA")
             for i in range(0, len(self.readlineDataDecoded)):
                 try:
                     self.readlineDataDecoded[i] = int(self.readlineDataDecoded[i])
@@ -55,5 +55,5 @@ class SerialCommunicator:
                 self.khani.tickLeft, self.khani.tickRight = self.readSerial()
                 print("{},{}".format(self.khani.tickLeft, self.khani.tickRight))
             except TypeError:
-                print("TypeError")
+                print("TypeError - SerialCommunicator()")
 
