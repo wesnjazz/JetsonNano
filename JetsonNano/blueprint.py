@@ -16,7 +16,7 @@ class Khani:
         self.robot = None
         # self.robot = Robot()
         self.serialCommunicator = SerialCommunicator(self)
-        self.serialCommunicator.observe('tick tok every 100', self.serialCommunicator.event_triggered)
+        self.serialCommunicator.observe('tiktok', self.serialCommunicator.event_triggered)
         # self.cameraHandler = CameraHandler()
         # self.cameraHandlerSampleImg = CameraHandlerSampleImg()
         # self.laneDetector = LaneDetector(self)

@@ -41,8 +41,6 @@ class SerialCommunicator (threading.Thread, Observer):
                     self.readlineDataDecoded[i] = self.lastTickLeft if i == 0 else self.lastTickRight
             self.lastTickLeft = self.readlineDataDecoded[0]
             self.lastTickRight = self.readlineDataDecoded[1]
-            if self.lastTickLeft % 10 or self.lastTickRight % 10 == 0:
-                self.event_triggered()
             return self.readlineDataDecoded[0], self.readlineDataDecoded[1]
         else:
             print("Serial data has only SINGLE DATA")
@@ -56,6 +54,7 @@ class SerialCommunicator (threading.Thread, Observer):
     def event_triggered(self):
         print('---- event_triggered -- SerialCommunicator() -----')
         print(self.lastTickLeft, self.lastTickRight)
+        print("{},{}".format(self.khani.tickLeft, self.khani.tickRight))
         print('--------------------------------------------------')
 
     def run(self):
@@ -64,6 +63,15 @@ class SerialCommunicator (threading.Thread, Observer):
             try:
                 self.khani.tickLeft, self.khani.tickRight = self.readSerial()
                 print("{},{}".format(self.khani.tickLeft, self.khani.tickRight))
-            except TypeError:
-                print("TypeError - SerialCommunicator()")
+                if self.khani.tickLeft % 10 or self.khani.tickRight % 10 == 0:
+                    # self.event_triggered()
+                    print('tiktok')
+                    Event('tiktok', self)
+                    continue
+                # print('return')
 
+            # except TypeError:
+            #     print("TypeError - SerialCommunicator()")
+
+            except:
+                pass
