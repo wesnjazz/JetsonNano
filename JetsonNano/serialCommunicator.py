@@ -1,13 +1,13 @@
 import serial
 import threading
 from time import sleep
-from observerManager import Observer, Event
+# from observerManager import Observer, Event
+import khani
 
-class SerialCommunicator (threading.Thread, Observer):
-    def __init__(self, khani, port = '/dev/ttyACM0', baudRate = 9600):
+class SerialCommunicator (threading.Thread, khani.Khani):
+    def __init__(self, port = '/dev/ttyACM0', baudRate = 9600):
         super().__init__()
-        Observer.__init__(self)
-        self.khani = khani
+        self.khani = Khani()
         self.port = port
         self.baudRate = baudRate
         self.lastTickLeft = 0
@@ -51,27 +51,11 @@ class SerialCommunicator (threading.Thread, Observer):
         self.serialObject.reset_input_buffer()
         self.serialObject.reset_output_buffer()
 
-    def event_triggered(self):
-        print('---- event_triggered -- SerialCommunicator() -----')
-        print(self.lastTickLeft, self.lastTickRight)
-        print("{},{}".format(self.khani.tickLeft, self.khani.tickRight))
-        print('--------------------------------------------------')
-
     def run(self):
         self.resetTicks()
         while True:
             try:
                 self.khani.tickLeft, self.khani.tickRight = self.readSerial()
-                print("{},{}".format(self.khani.tickLeft, self.khani.tickRight))
-                if self.khani.tickLeft % 10 or self.khani.tickRight % 10 == 0:
-                    # self.event_triggered()
-                    print('tiktok')
-                    Event('tiktok', self)
-                    continue
-                # print('return')
-
-            # except TypeError:
-            #     print("TypeError - SerialCommunicator()")
-
-            except:
-                pass
+                # print("{},{}".format(self.khani.tickLeft, self.khani.tickRight))
+            except TypeError:
+                print("TypeError - SerialCommunicator()")

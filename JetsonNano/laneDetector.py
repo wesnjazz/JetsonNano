@@ -2,6 +2,7 @@ import threading
 import cv2
 import numpy as np
 from time import sleep
+# from khani import Khani
 
 '''
 # ToDo:
@@ -17,8 +18,8 @@ class LaneDetector (threading.Thread):
         print("arg:", khani, "self:", self.khani)
         self.ROIMarked = self.khani.cameraHandlerSampleImg.sceneROI
         self.ROIHSL = None
-        # print("LaneDetector():", self.khani.cameraHandler.ROI)
-        # print("LaneDetector():", self.ROIMarked)
+        print("LaneDetector():", self.khani.cameraHandlerSampleImg.sceneROI)
+        print("LaneDetector():", self.ROIMarked)
 
 
     def detectLanes(self):

@@ -1,16 +1,19 @@
 import threading
 import cv2
 from time import sleep
+import khani
 
 '''
 # ToDo:
     - save file or not
 '''
 
-
 class CameraHandlerSampleImg(threading.Thread):
     def __init__(self, width=640, height=480, saveFramesToFile=True):
         super().__init__()
+        # Khani.__init__(self)
+        # print(super())
+        # print(super().__dir__())
 
         # Set camera frame size
         self.width = width
