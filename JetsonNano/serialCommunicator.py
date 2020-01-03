@@ -1,10 +1,12 @@
 import serial
 import threading
 from time import sleep
+from observerManager import Observer, Event
 
-class SerialCommunicator (threading.Thread):
+class SerialCommunicator (threading.Thread, Observer):
     def __init__(self, khani, port = '/dev/ttyACM0', baudRate = 9600):
         super().__init__()
+        Observer.__init__(self)
         self.khani = khani
         self.port = port
         self.baudRate = baudRate
@@ -39,6 +41,8 @@ class SerialCommunicator (threading.Thread):
                     self.readlineDataDecoded[i] = self.lastTickLeft if i == 0 else self.lastTickRight
             self.lastTickLeft = self.readlineDataDecoded[0]
             self.lastTickRight = self.readlineDataDecoded[1]
+            if self.lastTickLeft % 10 or self.lastTickRight % 10 == 0:
+                self.event_triggered()
             return self.readlineDataDecoded[0], self.readlineDataDecoded[1]
         else:
             print("Serial data has only SINGLE DATA")
@@ -49,12 +53,17 @@ class SerialCommunicator (threading.Thread):
         self.serialObject.reset_input_buffer()
         self.serialObject.reset_output_buffer()
 
+    def event_triggered(self):
+        print('---- event_triggered -- SerialCommunicator() -----')
+        print(self.lastTickLeft, self.lastTickRight)
+        print('--------------------------------------------------')
+
     def run(self):
         self.resetTicks()
         while True:
             try:
                 self.khani.tickLeft, self.khani.tickRight = self.readSerial()
-                # print("{},{}".format(self.khani.tickLeft, self.khani.tickRight))
+                print("{},{}".format(self.khani.tickLeft, self.khani.tickRight))
             except TypeError:
                 print("TypeError - SerialCommunicator()")
 

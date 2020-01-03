@@ -4,6 +4,7 @@ import argparse
 import time
 from time import sleep
 # from jetbot import Robot
+from observerManager import Observer, Event
 from serialCommunicator import SerialCommunicator
 # from cameraHandler import CameraHandler
 from cameraHandlerSampleImg import CameraHandlerSampleImg
@@ -15,9 +16,10 @@ class Khani:
         self.robot = None
         # self.robot = Robot()
         self.serialCommunicator = SerialCommunicator(self)
+        self.serialCommunicator.observe('tick tok every 100', self.serialCommunicator.event_triggered)
         # self.cameraHandler = CameraHandler()
-        self.cameraHandlerSampleImg = CameraHandlerSampleImg()
-        self.laneDetector = LaneDetector(self)
+        # self.cameraHandlerSampleImg = CameraHandlerSampleImg()
+        # self.laneDetector = LaneDetector(self)
         # self.robotDriver = RobotDriver(self)
         self.threadPool = []
         self.tickLeft = 0
@@ -26,9 +28,12 @@ class Khani:
         print("Khani():", self)
         self.serialCommunicator.resetTicks()
 
+    # def ObserveEvents(self):
+    #
+
     def startThreads(self):
         self.threadPool.append(self.serialCommunicator)
-        self.threadPool.append(self.cameraHandlerSampleImg)
+        # self.threadPool.append(self.cameraHandlerSampleImg)
         # self.threadPool.append(CameraHandler())
 
         # self.threadPool.append(LaneDetector(self))
@@ -39,7 +44,7 @@ class Khani:
     def start(self):
         self.startThreads()
         while True:
-            self.laneDetector.detectLanes()
+            # self.laneDetector.detectLanes()
             pass
 
 def main():
