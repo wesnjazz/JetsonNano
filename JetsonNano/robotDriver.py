@@ -6,6 +6,7 @@ from time import sleep
 class RobotDriver:
     def __init__(self, khani):
         self.khani = khani
+        self.khani.robot = Robot()
         self.motorSpeedLeft = 0
         self.motorSpeedRight = 0
 

@@ -2,8 +2,9 @@ import serial
 import threading
 from time import sleep
 
-class SerialCommunicator:
+class SerialCommunicator (threading.Thread):
     def __init__(self, khani, port = '/dev/ttyACM0', baudRate = 9600):
+        super().__init__()
         self.khani = khani
         self.port = port
         self.baudRate = baudRate
@@ -48,12 +49,12 @@ class SerialCommunicator:
         self.serialObject.reset_input_buffer()
         self.serialObject.reset_output_buffer()
 
-    def startThread(self):
+    def run(self):
         self.resetTicks()
         while True:
             try:
                 self.khani.tickLeft, self.khani.tickRight = self.readSerial()
-                print("{},{}".format(self.khani.tickLeft, self.khani.tickRight))
+                # print("{},{}".format(self.khani.tickLeft, self.khani.tickRight))
             except TypeError:
                 print("TypeError - SerialCommunicator()")
 

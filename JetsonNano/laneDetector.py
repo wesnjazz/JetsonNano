@@ -9,20 +9,37 @@ from time import sleep
     - save file or not
 '''
 
-class LaneDetector:
+class LaneDetector (threading.Thread):
     def __init__(self, khani):
+        super().__init__()
+        # print("LaneDetector() created")
         self.khani = khani
-        self.ROIMarked = self.khani.cameraHandler.ROI
+        print("arg:", khani, "self:", self.khani)
+        self.ROIMarked = self.khani.cameraHandlerSampleImg.sceneROI
         self.ROIHSL = None
+        # print("LaneDetector():", self.khani.cameraHandler.ROI)
+        # print("LaneDetector():", self.ROIMarked)
+
 
     def detectLanes(self):
         # Convert BGR to HSL
-        if self.ROIMarked == None:
+        # if self.ROIMarked == None:
             # raise Exception('ROIMarked is None')
-            print("detect Lanes() ROIMakred is None")
-            return None
-        print("detect Lanes() yeah!!!")
-        self.ROIHSL = cv2.cvtColor(self.ROIMarked, cv2.COLOR_BGR2HSV)
+            # print("detect Lanes() ROIMakred is None")
+            # return None
+        # print("detect Lanes() yeah!!!")
+        # self.ROIHSL = cv2.cvtColor(self.ROIMarked, cv2.COLOR_BGR2HLS)
+        sleep(1)
+        # self.khani.cameraHandlerSampleImg.checkROI()
+        # self.checkROI()
+        if self.ROIMarked == None:
+            print('self.ROIMarked == None')
+            return
+        self.ROIHSL = self.ROIMarked
+        if self.ROIHSL.any():
+            print("ROIHSL converted!")
+        else:
+            print("ROIHSL not exists")
 
         lower_yellow = np.array([40, 70, 40])
         upper_yellow = np.array([70, 100, 60])
@@ -59,9 +76,18 @@ class LaneDetector:
         # self.markedImage[bottom:bottom-width][left:right][1] = 0
         # self.markedImage[bottom:bottom-width][left:right][2] = 0
 
-    def startThread(self):
+    def checkROI(self):
+        print("checkROI() - LaneDetector(): ", type(self.ROIMarked))
+        if self.ROIMarked.any() == True:
+            print(self.ROIMarked.shape)
+
+    def run(self):
         while True:
+            # sleep(0.1)
             try:
-                self.detectLanes()
+                self.checkROI()
+                self.khani.cameraHandlerSampleImg.checkROI()
+                # self.detectLanes()
+                # print("detectLane() ", type(self.ROIMarked), self.ROIMarked.shape)
             except TypeError:
                 print("TypeError - CameraHandler()")
