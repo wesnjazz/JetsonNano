@@ -4,9 +4,10 @@ import khani
 
 
 def main():
-    KhaniJet = khani.Khani()
+    var = khani.Var()
+    KhaniJet = khani.Khani(var)
     print("Khani() object created. wait for 2 seconds...")
-    sleep(2)
+    # sleep(2)
 
     # start threads and kill all threads when Keyboard Interrupt signal (ctrl+c) occurred.
     try:
@@ -15,6 +16,9 @@ def main():
         for i in range(len(KhaniJet.threadPool)):
             self.threadPool[i].join()
             sys.exit()
+
+    # while True:
+        # print(KhaniJet.var.tickLeft, KhaniJet.var.tickRight)
 
     # khani.robotDriver.driveXcm(100,0.0,0.0)
     # khani.robotDriver.driveXcm(30,0.3,0.33)
