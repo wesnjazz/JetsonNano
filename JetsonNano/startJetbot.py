@@ -5,7 +5,6 @@ import khani
 
 def main():
     KhaniJet = khani.Khani()
-    print(KhaniJet)
     print("Khani() object created. wait for 2 seconds...")
     sleep(2)
 
@@ -13,7 +12,7 @@ def main():
     try:
         KhaniJet.start()
     except (KeyboardInterrupt, SystemExit):
-        for i in range(len(self.threadPool)):
+        for i in range(len(KhaniJet.threadPool)):
             self.threadPool[i].join()
             sys.exit()
 
