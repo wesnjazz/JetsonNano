@@ -5,20 +5,21 @@ import time
 import cv2
 import numpy as np
 import copy
+import jetbot
 
 class Khani:
     def __init__(self, var):
         self.var = var
         self.serialCommunicator = SerialCommunicator(self, var)
-        self.cameraHandler = CameraHandlerSampleImg(self, var)
-        # sleep(2)
+        self.cameraHandler = CameraHandler(self, var)
+        sleep(2)
         self.laneDetector = LaneDetector(self ,var)
         # self.serialCommunicator = None
         # self.serialCommunicator.observe('tiktok', self.serialCommunicator.event_triggered)
         # self.cameraHandler = CameraHandler()
         # self.cameraHandlerSampleImg = None
         # self.laneDetector = None
-        # self.robotDriver = RobotDriver(self)
+        self.robotDriver = RobotDriver(self, var)
 
         self.threadPool = []
         self.tickLeft = 0
@@ -31,6 +32,7 @@ class Khani:
         self.threadPool.append(self.cameraHandler)
         # self.threadPool.append(CameraHandler())
         self.threadPool.append(self.laneDetector)
+        self.threadPool.append(self.robotDriver)
 
         for i in range(len(self.threadPool)):
             self.threadPool[i].start()
@@ -56,6 +58,7 @@ class Var:
         self.serialObject = None
 
         # CameraHandler
+        self.camera = None
         self.camWidth = 0
         self.camHeight = 0
         self.scene = None
@@ -67,6 +70,11 @@ class Var:
         self.ROILeft = 0
         self.ROIWidth = 0
         self.ROIBorder = 0
+
+        # RobotDriver
+        self.robot = None
+        self.motorSpeedLeft = 0
+        self.motorSpeedRight = 0
 
 
 class SerialCommunicator (threading.Thread):
@@ -121,6 +129,83 @@ class SerialCommunicator (threading.Thread):
                 print("TypeError - SerialCommunicator()")
 
 
+class CameraHandler(threading.Thread):
+    def __init__(self, khani, var, width=640, height=480, \
+                 ROITop=160, ROIHeight=240, ROILeft=0, ROIWidth=640, saveFramesToFile=True):
+        super().__init__()
+        self.khani = khani
+        self.var = var
+        self.var.camWidth = width
+        self.var.camHeight = height
+        self.var.camera = jetbot.Camera.instance(width=self.var.camWidth, height=self.var.camHeight)
+        # Region Of Interest and Whole scene
+        self.var.ROITop = ROITop
+        self.var.ROIHeight = ROIHeight
+        self.var.ROILeft = ROILeft
+        self.var.ROIWidth = ROIWidth
+
+    def cropROI(self, scene):
+        # cv2.imwrite('./img/scene.jpg', scene)
+
+        # ROI value range: 0 ~ 100
+        self.var.ROI = scene[self.var.ROITop:self.var.ROITop + self.var.ROIHeight, \
+                            self.var.ROILeft:self.var.ROILeft + self.var.ROIWidth, :]
+        # cv2.imwrite('./img/ROI.jpg', self.var.ROI)
+
+    def updateScene(self):
+        self.var.scene = self.var.camera.value
+
+    def saveROIFileFromSampleImage(self):
+        save = cv2.imwrite('./img/sample/sampleROI.jpg', self.var.ROI)
+        # if save:
+        #     self.var.ROI = cv2.imread('./img/sample/sampleROI.jpg')
+
+    def markROIinScene(self):
+        self.var.ROIBorder = 2
+        border = self.var.ROIBorder
+        top = self.var.ROITop
+        height = self.var.ROIHeight
+        left = self.var.ROILeft
+        width = self.var.ROIWidth
+
+        self.var.sceneROIMarked = copy.deepcopy(self.var.scene)
+
+        # left border
+        self.var.sceneROIMarked[top:top+height, left:left+border, 0] = 255
+        self.var.sceneROIMarked[top:top+height, left:left+border, 1] = 0
+        self.var.sceneROIMarked[top:top+height, left:left+border, 2] = 0
+        # right border
+        self.var.sceneROIMarked[top:top+height, left+width-border:left+width, 0] = 255
+        self.var.sceneROIMarked[top:top+height, left+width-border:left+width, 1] = 0
+        self.var.sceneROIMarked[top:top+height, left+width-border:left+width, 2] = 0
+        # top border
+        self.var.sceneROIMarked[top:top+border, left:left+width, 0] = 255
+        self.var.sceneROIMarked[top:top+border, left:left+width, 1] = 0
+        self.var.sceneROIMarked[top:top+border, left:left+width, 2] = 0
+        # bottom border
+        self.var.sceneROIMarked[top+height-border:top+height, left:left+width, 0] = 255
+        self.var.sceneROIMarked[top+height-border:top+height, left:left+width, 1] = 0
+        self.var.sceneROIMarked[top+height-border:top+height, left:left+width, 2] = 0
+        # cv2.imwrite('./img/ROI.jpg', self.var.ROI)
+        # cv2.imwrite('./img/sceneROIMarked.jpg', self.var.sceneROIMarked)
+
+    def run(self):
+        while True:
+            # sleep(1)
+            try:
+                # Load sample frame from img file
+                self.updateScene()
+
+                # Crop ROI from whole scene
+                self.cropROI(self.var.scene)
+                # Mark ROI in whole scene for debugging
+                self.markROIinScene()
+
+                # Save to file
+                # self.saveROIFileFromSampleImage()
+            except TypeError:
+                print("TypeError - CameraHandlerSampleImg()")
+
 class CameraHandlerSampleImg(threading.Thread):
     def __init__(self, khani, var, width=640, height=480, \
                  ROITop=160, ROIHeight=240, ROILeft=0, ROIWidth=640, saveFramesToFile=True):
@@ -135,11 +220,11 @@ class CameraHandlerSampleImg(threading.Thread):
         self.var.ROILeft = ROILeft
         self.var.ROIWidth = ROIWidth
 
-    def cropROI(self, frame):
-        cv2.imwrite('./img/frame.jpg', frame)
+    def cropROI(self, scene):
+        cv2.imwrite('./img/scene.jpg', scene)
 
         # ROI value range: 0 ~ 100
-        self.var.ROI = frame[self.var.ROITop:self.var.ROITop + self.var.ROIHeight, \
+        self.var.ROI = scene[self.var.ROITop:self.var.ROITop + self.var.ROIHeight, \
                             self.var.ROILeft:self.var.ROILeft + self.var.ROIWidth, :]
         cv2.imwrite('./img/ROI.jpg', self.var.ROI)
 
@@ -203,14 +288,42 @@ class LaneDetector (threading.Thread):
         self.khani = khani
         self.var = var
 
+        self.detect_count = 0
+
     def detectLanes(self):
         # Convert BGR to HSL
         if self.var.ROI is None:
-            print('img not laoded', time.time())
+            # print('ROI is empty', time.time())
             return
         else:
-            # print('img loaded', time.time())
             self.var.ROIHSV = cv2.cvtColor(self.var.ROI, cv2.COLOR_BGR2HSV)
+
+        # Yellow lane
+        low_yellow = np.array([20, 100, 100])
+        high_yellow = np.array([30, 255, 255])
+        yellow_mask = cv2.inRange(self.var.ROIHSV, low_yellow, high_yellow)
+        yellow = cv2.bitwise_and(self.var.ROI, self.var.ROI, mask=yellow_mask)
+        yellow_sum = yellow_mask.sum(axis = 0)
+        yellow_center = yellow_sum.argmax()
+        yellow[np.arange(len(yellow)), yellow_center] = 255
+        # cv2.imwrite('./img/ROIyellowHSV.jpg', self.var.ROIHSV)
+        # cv2.imwrite('./img/ROIyellowscene.jpg', self.var.scene)
+        # cv2.imwrite('./img/ROIyellowresult.jpg', yellow)
+        # cv2.imwrite('./img/ROIyellowMask.jpg', yellow_mask)
+        # print('yellow_center:', yellow_center, yellow.shape)
+
+        # White lane
+        low_white = np.array([0, 0, 220])
+        high_white = np.array([255, 100, 255])
+        white_mask = cv2.inRange(self.var.ROIHSV, low_white, high_white)
+        white = cv2.bitwise_and(self.var.ROI, self.var.ROI, mask=white_mask)
+        white_sum = white_mask.sum(axis = 0)
+        white_center = white_sum.argmax()
+        white[np.arange(len(white)), white_center] = 255
+        # cv2.imwrite('./img/ROIwhiteHSV.jpg', self.var.ROIHSV)
+        # cv2.imwrite('./img/ROIwhitescene.jpg', self.var.scene)
+        # cv2.imwrite('./img/ROIwhiteresult.jpg', white)
+        # cv2.imwrite('./img/ROIwhiteMask.jpg', white_mask)
 
         # Red color
         low_min_red = np.array([0, 100, 100])
@@ -221,77 +334,26 @@ class LaneDetector (threading.Thread):
         red_high_mask = cv2.inRange(self.var.ROIHSV, high_min_red, high_max_red)
         red = cv2.bitwise_and(self.var.ROI, self.var.ROI, mask=red_low_mask) + \
               cv2.bitwise_and(self.var.ROI, self.var.ROI, mask=red_high_mask)
-        cv2.imwrite('./img/ROIredHSV.jpg', self.var.ROIHSV)
-        cv2.imwrite('./img/ROIredscene.jpg', self.var.scene)
-        cv2.imwrite('./img/ROIredresult.jpg', red)
-        cv2.imwrite('./img/ROIredMasklow.jpg', red_low_mask)
-        cv2.imwrite('./img/ROIredMaskhigh.jpg', red_high_mask)
+        red_sum = red_low_mask.sum(axis = 0) + red_high_mask.sum(axis = 0)
+        red_center = red_sum.argmax()
+        red[np.arange(len(red)), red_center] = 255
+        # red[np.arange(len(red)), red_center][0] = 255
+        # red[np.arange(len(red)), red_center][1] = 0
+        # red[np.arange(len(red)), red_center][2] = 255
+        # red[red_center] = 255
+        # cv2.imwrite('./img/ROIredHSV.jpg', self.var.ROIHSV)
+        # cv2.imwrite('./img/ROIredscene.jpg', self.var.scene)
+        # cv2.imwrite('./img/ROIredresult.jpg', red)
+        # cv2.imwrite('./img/ROIredMasklow.jpg', red_low_mask)
+        # cv2.imwrite('./img/ROIredMaskhigh.jpg', red_high_mask)
 
-        # Yellow lane
-        low_yellow = np.array([20, 100, 100])
-        high_yellow = np.array([30, 255, 255])
-        yellow_mask = cv2.inRange(self.var.ROIHSV, low_yellow, high_yellow)
-        yellow = cv2.bitwise_and(self.var.ROI, self.var.ROI, mask=yellow_mask)
-        cv2.imwrite('./img/ROIyellowHSV.jpg', self.var.ROIHSV)
-        cv2.imwrite('./img/ROIyellowscene.jpg', self.var.scene)
-        cv2.imwrite('./img/ROIyellowresult.jpg', yellow)
-        cv2.imwrite('./img/ROIyellowMask.jpg', yellow_mask)
-
-        # White lane
-        low_white = np.array([0, 0, 220])
-        high_white = np.array([255, 100, 255])
-        white_mask = cv2.inRange(self.var.ROIHSV, low_white, high_white)
-        white = cv2.bitwise_and(self.var.ROI, self.var.ROI, mask=white_mask)
-        cv2.imwrite('./img/ROIwhiteHSV.jpg', self.var.ROIHSV)
-        cv2.imwrite('./img/ROIwhitescene.jpg', self.var.scene)
-        cv2.imwrite('./img/ROIwhiteresult.jpg', white)
-        cv2.imwrite('./img/ROIwhiteMask.jpg', white_mask)
-
-
-        # # Range for lower red
-        # lower_red = np.array([0, 120, 70])
-        # upper_red = np.array([10, 255, 255])
-        # mask1 = cv2.inRange(self.var.ROIHSV, lower_red, upper_red)
-        #
-        # # Range for upper range
-        # lower_red = np.array([170, 120, 70])
-        # upper_red = np.array([180, 255, 255])
-        # mask2 = cv2.inRange(self.var.ROIHSV, lower_red, upper_red)
-
-        # # Generating the final mask to detect red color
-        # mask = mask1 + mask2
-        #
-        # mask1 = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
-        # mask1 = cv2.morphologyEx(mask, cv2.MORPH_DILATE, np.ones((3, 3), np.uint8))
-        #
-        # # creating an inverted mask to segment out the cloth from the frame
-        # mask2 = cv2.bitwise_not(mask1)
-        #
-        # # Segmenting the cloth out of the frame using bitwise and with the inverted mask
-        # res1 = cv2.bitwise_and(self.var.ROIMarked, self.var.ROIMarked, mask=mask2)
-        #
-        # # creating image showing static background frame pixels only for the masked region
-        # res2 = cv2.bitwise_and(self.var.ROI, self.var.ROI, mask=mask1)
-        #
-        # # Generating the final output
-        # final_output = cv2.addWeighted(res1, 1, res2, 1, 0)
-
-        # lower_yellow = np.array([0, 30, 80])
-        # upper_yellow = np.array([20, 70, 120])
-        #
-        # mask = cv2.inRange(self.var.ROIHSV, lower_yellow, upper_yellow)
-        # result = cv2.bitwise_and(self.var.ROI, self.var.ROI, mask=mask)
-
-        # a = np.zeros([3,3,3])
-        # print(type(a))
-        # print(a.shape)
-        # a[:,:3,0] = 255
-
-        # cv2.imwrite('./img/a.jpg', a)
-        # cv2.imwrite('./img/ROIfinal.jpg', final_output)
-        # cv2.imwrite('./img/ROI.jpg', self.var.ROI)
-        # cv2.imwrite('./img/ROIMarked.jpg', self.var.ROIMarked)
-        # cv2.imwrite('./img/ROIResult.jpg', result)
+        detected_lanes = yellow + white + red
+        prefix = './img/detectLanes/lane'
+        self.detect_count += 1
+        midfix = str(self.detect_count).zfill(10)
+        suffix = ".jpg"
+        detected_lanes_filename = "{}{}{}".format(prefix, midfix, suffix)
+        cv2.imwrite(detected_lanes_filename, detected_lanes)
 
     def run(self):
         while True:
@@ -309,3 +371,67 @@ class LaneDetector (threading.Thread):
                 pass
             except TypeError:
                 print("TypeError - CameraHandler()")
+
+
+class RobotDriver(threading.Thread):
+    def __init__(self, khani, var):
+        super().__init__()
+        self.khani = khani
+        self.var = var
+        self.robot = jetbot.Robot()
+        self.var.motorSpeedLeft = 0
+        self.var.motorSpeedRight = 0
+
+        ###### Ticks ######
+        # 1 revolution = 1938 ticks
+        # wheel circumference = 20.5cm
+        # 1 tick = 20.5cm / 1938 ticks = 0.0106cm = 0.106mm
+        # number of ticks 't' to travel 'x' distance:
+        # t = x / 0.0106 (in cm)
+        self.cm_per_tick = 0.0106
+
+    def driveXcm(self, x, motorSpeedLeft = 0.3, motorSpeedRight = 0.3):
+        requiredTicks = self.calculateTicksForXCm(x)
+        print("required Ticks:{}".format(requiredTicks))
+        # sleep(2)
+        while True:
+            if self.var.robot is None:
+                print('robot is None')
+                self.var.robot = jetbot.Robot()
+                print('robot created!')
+            else:
+                print('robot existed')
+                break
+
+        print(self.var.robot, self.var.tickLeft, self.var.tickRight)
+        goalTicksLeft = self.var.tickLeft + requiredTicks
+        goalTicksRight = self.var.tickRight + requiredTicks
+        self.var.robot.set_motors(motorSpeedLeft, motorSpeedRight)
+        while self.var.tickLeft <= goalTicksLeft and self.var.tickRight <= goalTicksRight:
+            pass
+        self.var.robot.stop()
+
+    def turnXLaps(self, counterClockwise = True):
+        if counterClockwise == True:
+            self.var.robot.set_motors(0.3, 0.6)
+        sleep(10)
+        self.var.robot.stop()
+
+    def calculateTicksForXCm(self, x):
+        return x // self.cm_per_tick
+
+    def run(self):
+        print('RobotDriver started!!!')
+        try:
+            self.driveXcm(60,0.3,0.33)
+            # self.printROI()
+            # ROIExists = self.updateROI()
+            # while not ROIExists:
+            #     sleep(0.2)
+            #     print("ROI not exists")
+            #     ROIExists = self.updateROI()
+            # self.markROIinScene()
+            # print("detectLane() ", type(self.ROIMarked), self.ROIMarked.shape)
+            pass
+        except:
+            print("Error - RobotDriver()")
