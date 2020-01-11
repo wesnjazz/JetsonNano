@@ -13,17 +13,14 @@ import jetbot
 class Khani:
     def __init__(self, var):
         self.var = var
-        self.serialCommunicator = SerialCommunicator(self, var, printInfo=True)
         self.cameraHandler = CameraHandler(self, var, saveFramesToFile=False)
         # self.cameraHandler = CameraHandlerSampleImg(self, var)
+        print('Creating a Camera instance...', end=' ')
         sleep(2)
-        self.laneDetector = LaneDetector(self ,var, printInfo=False, saveFramesToFile=False)
-        self.PIDController = PIDController(self, var, printInfo=False)
-        # self.serialCommunicator = None
-        # self.serialCommunicator.observe('tiktok', self.serialCommunicator.event_triggered)
-        # self.cameraHandler = CameraHandler()
-        # self.cameraHandlerSampleImg = None
-        # self.laneDetector = None
+        print('done')
+        self.serialCommunicator = SerialCommunicator(self, var, printInfo=False)
+        self.laneDetector = LaneDetector(self ,var, printInfo=False, saveFramesToFile=True)
+        self.PIDController = PIDController(self, var, printInfo=True)
         self.robotDriver = RobotDriver(self, var)
 
         self.threadPool = []
@@ -33,16 +30,8 @@ class Khani:
         self.serialCommunicator.resetTicks()
 
     def startThreads(self):
-        self.var.tickQueue = Queue.Queue(maxsize = 1)
-        self.var.tickLastQueue = Queue.Queue(maxsize = 1)
-        self.var.tickDeque = deque(maxlen=2)
-        self.var.tickLastDeque = deque(maxlen=1)
-        self.var.lock = threading.Lock()
-        self.var.eventSerialRead = threading.Event()
-        self.var.eventConsumeTicks = threading.Event()
         self.threadPool.append(self.serialCommunicator)
         self.threadPool.append(self.cameraHandler)
-        # self.threadPool.append(CameraHandler())
         self.threadPool.append(self.laneDetector)
         self.threadPool.append(self.robotDriver)
         self.threadPool.append(self.PIDController)
@@ -69,18 +58,20 @@ class Var:
         # SerialCommunicator
         self.port = port
         self.baudRate = baudRate
-        self.tickQueue = None
-        self.tickLastQueue = None
-        self.tickDeque = None
-        self.tickLastDeque = None
-        self.tickEvent = None
-        self.eventConsumeTicks = None
+        self.tickDeque = deque(maxlen=2)
+        self.eventSerialRead = threading.Event()
+        self.eventConsumeTicks = threading.Event()
+        self.eventCameraCaptured = threading.Event()
+        self.eventLaneDetected = threading.Event()
         self.tickLeft = 0
         self.tickRight = 0
         self.tickMean = 0
         self.tickLeftLast = 0
         self.tickRightLast = 0
         self.tickMeanLast = 0
+        self.tickAtTimeT = time.time()
+        self.tickAtTimeTLast = self.tickAtTimeT
+        self.deltaT = 0.0
         self.readlineDataRaw = None
         self.readlineDataDecoded = None
         self.serialObject = None
@@ -103,6 +94,7 @@ class Var:
         self.ROIPointRed = 0
         self.centerOfLane = 0
         self.centerOfCamera = 0
+        self.centerError = 0
 
         # 1 revolution = 1938 ticks
         # wheel circumference = 20.5cm
@@ -115,14 +107,19 @@ class Var:
         self.wheelBase = 11.3
 
         # Positions
+        self.deltaS = 0.0
+        self.deltaSLeft = 0.0
+        self.deltaSRight = 0.0
         self.deltaX = 0.0
-        self.deltaXLeft = 0.0
-        self.deltaXRight = 0.0
         self.deltaY = 0.0
-        self.deltaTheta = 0.0
+        self.deltaThetaRadian = 0.0
+        self.deltaThetaDegree = 0.0
+        self.thetaDotAct = 0.0
+        self.thetaDotDot = 0.0
         self.displacementX = 0.0
         self.displacementY = 0.0
-        self.displacementTheta = 0.0
+        self.displacementThetaRadian = 0.0
+        self.displacementThetaDegree = 0.0
 
         # RobotDriver
         self.robot = None
@@ -149,6 +146,7 @@ class SerialCommunicator (threading.Thread):
         super().__init__()
         self.khani = khani
         self.var = var
+        self.printInfo = printInfo
 
         # open the serial port
         self.var.serialObject = serial.Serial(self.var.port, self.var.baudRate)
@@ -156,7 +154,6 @@ class SerialCommunicator (threading.Thread):
         self.var.serialObject.reset_input_buffer()
         self.var.serialObject.reset_output_buffer()
 
-        self.printInfo = printInfo
 
     def readSerial(self):
         # read data from Arduino through serial port
@@ -167,11 +164,8 @@ class SerialCommunicator (threading.Thread):
         except UnicodeDecodeError:
             print("UnicodeDecodeError")
             self.var.readlineDataDecoded = [self.var.tickLeftLast, self.var.tickRightLast]
+
         # if serial data has both left/right ticks
-
-        # self.var.tickLeftLast = self.var.tickLeft
-        # self.var.tickRightLast = self.var.tickRightLast
-
         if len(self.var.readlineDataDecoded) >= 2:
             # print("Serial data has Double DATA")
             for i in range(0, len(self.var.readlineDataDecoded)):
@@ -184,7 +178,7 @@ class SerialCommunicator (threading.Thread):
             self.var.tickRight = self.var.readlineDataDecoded[1]
             return self.var.tickLeft, self.var.tickRight
         else:
-            print("Serial data has only SINGLE DATA")
+            print("Serial data has only SINGLE DATA... return last ticks")
             return self.var.tickLeftLast, self.var.tickRightLast
 
     def resetTicks(self):
@@ -199,35 +193,34 @@ class SerialCommunicator (threading.Thread):
             sleep(0.01)
             serialcount += 1
             try:
-                # self.var.lock.acquire()
-                print(serialcount, ' read serial.....', end=' ')
+                # print(serialcount, ' read serial.....', end=' ')
                 self.var.tickLeftLast = self.var.tickLeft
                 self.var.tickRightLast = self.var.tickRight
-                # self.var.tickMeanLast = (self.var.tickLeftLast + self.var.tickRightLast) // 2
-                # self.var.tickLastQueue.put((self.var.tickLeftLast, self.var.tickRightLast))
+                self.var.tickAtTimeTLast = self.var.tickAtTimeT
+                self.var.tickMeanLast = (self.var.tickLeftLast + self.var.tickRightLast) // 2
                 self.var.tickDeque.append((self.var.tickLeftLast, self.var.tickRightLast))
+                self.var.tickAtTimeT = time.time()
+                self.var.deltaT = self.var.tickAtTimeT - self.var.tickAtTimeTLast
 
                 self.var.tickLeft, self.var.tickRight = self.readSerial()
-                # self.var.tickMean = (self.var.tickLeft + self.var.tickRight) // 2
+                self.var.tickMean = (self.var.tickLeft + self.var.tickRight) // 2
                 self.var.tickDeque.append((self.var.tickLeft, self.var.tickRight))
 
                 self.var.eventSerialRead.set()
                 self.var.eventSerialRead.clear()
                 self.var.eventConsumeTicks.wait()
-                print(' set and clear', end=' ')
+                # print(' set and clear', end=' ')
                 if self.printInfo:
                     print("Current:{},{} - Mean:{}   Last:{},{} - Mean:{}".format(\
                         self.var.tickLeft, self.var.tickRight, self.var.tickMean, \
                         self.var.tickLeftLast, self.var.tickRightLast, self.var.tickMeanLast))
-
-                # self.var.lock.release()
             except TypeError:
                 print("TypeError - SerialCommunicator()")
 
 
 class CameraHandler(threading.Thread):
     def __init__(self, khani, var, width=640, height=480, \
-                 ROITop=200, ROIHeight=100, ROILeft=100, ROIWidth=640, saveFramesToFile=True):
+                 ROITop=240, ROIHeight=200, ROILeft=0, ROIWidth=640, saveFramesToFile=True):
         super().__init__()
         self.khani = khani
         self.var = var
@@ -287,9 +280,12 @@ class CameraHandler(threading.Thread):
         self.var.sceneROIMarked[top+height-border:top+height, left:left+width, 2] = 0
 
     def run(self):
+        # count = 0
         while True:
             # sleep(1)
             try:
+                # count += 1
+                # print('camera count: ', count, ' .... ', end=' ')
                 # Load sample frame from img file
                 self.updateScene()
 
@@ -301,6 +297,11 @@ class CameraHandler(threading.Thread):
                 # Save to file
                 if self.saveFramesToFile:
                     self.saveROIFileFromSampleImage()
+
+                self.var.eventCameraCaptured.set()
+                self.var.eventCameraCaptured.clear()
+                # print('camera done')
+                # self.var.eventLaneDetected.wait()
             except TypeError:
                 print("TypeError - CameraHandlerSampleImg()")
 
@@ -385,10 +386,10 @@ class LaneDetector (threading.Thread):
         super().__init__()
         self.khani = khani
         self.var = var
-
-        self.detect_count = 0
         self.printInfo = printInfo
         self.saveFramesToFile = saveFramesToFile
+
+        self.detect_count = 0
 
     def detectLanes(self):
         # Convert BGR to HSL
@@ -443,6 +444,8 @@ class LaneDetector (threading.Thread):
 
         self.var.centerOfLane = (self.var.ROIPointYellow + self.var.ROIPointWhite) // 2
         self.var.centerOfCamera = (self.var.camWidth // 2) - self.var.ROILeft
+        # self.var.centerError = self.var.centerOfCamera - self.var.centerOfLane
+        self.var.centerError = self.var.centerOfLane - self.var.centerOfCamera
 
         detected_lanes = yellow + white + red
         detected_lanes[:, self.var.centerOfLane:self.var.centerOfLane+self.var.ROIBorder, 0] = 0
@@ -453,26 +456,29 @@ class LaneDetector (threading.Thread):
         detected_lanes[:, self.var.centerOfCamera:self.var.centerOfCamera+self.var.ROIBorder, 2] = 255
 
         if self.printInfo:
-            print('center of Yellow/White/Red: {:0>3d} / {:0>3d} / {:0>3d}'.format(yellow_center, white_center, red_center))
+            print('center of Camera, Lane: {:0>3d}, {:0>3d}  Center Error: {:0>3d}'.format(\
+                self.var.centerOfCamera, self.var.centerOfLane, self.var.centerError))
+            # print('center of Yellow/White/Red: {:0>3d} / {:0>3d} / {:0>3d}'.format(yellow_center, white_center, red_center))
+            pass
 
         if self.saveFramesToFile:
-            cv2.imwrite('./img/ROIyellowHSV.jpg', self.var.ROIHSV)
-            cv2.imwrite('./img/ROIyellowscene.jpg', self.var.scene)
-            cv2.imwrite('./img/ROIyellowresult.jpg', yellow)
-            cv2.imwrite('./img/ROIyellowMask.jpg', yellow_mask)
-            print('yellow_center:', yellow_center, yellow.shape)
+            # cv2.imwrite('./img/ROIyellowHSV.jpg', self.var.ROIHSV)
+            # cv2.imwrite('./img/ROIyellowscene.jpg', self.var.scene)
+            # cv2.imwrite('./img/ROIyellowresult.jpg', yellow)
+            # cv2.imwrite('./img/ROIyellowMask.jpg', yellow_mask)
+            # print('yellow_center:', yellow_center, yellow.shape)
 
-            cv2.imwrite('./img/ROIwhiteHSV.jpg', self.var.ROIHSV)
-            cv2.imwrite('./img/ROIwhitescene.jpg', self.var.scene)
-            cv2.imwrite('./img/ROIwhiteresult.jpg', white)
-            cv2.imwrite('./img/ROIwhiteMask.jpg', white_mask)
-            print('white_center:', white_center, white.shape)
+            # cv2.imwrite('./img/ROIwhiteHSV.jpg', self.var.ROIHSV)
+            # cv2.imwrite('./img/ROIwhitescene.jpg', self.var.scene)
+            # cv2.imwrite('./img/ROIwhiteresult.jpg', white)
+            # cv2.imwrite('./img/ROIwhiteMask.jpg', white_mask)
+            # print('white_center:', white_center, white.shape)
 
-            cv2.imwrite('./img/ROIredHSV.jpg', self.var.ROIHSV)
-            cv2.imwrite('./img/ROIredscene.jpg', self.var.scene)
-            cv2.imwrite('./img/ROIredresult.jpg', red)
-            cv2.imwrite('./img/ROIredMasklow.jpg', red_low_mask)
-            cv2.imwrite('./img/ROIredMaskhigh.jpg', red_high_mask)
+            # cv2.imwrite('./img/ROIredHSV.jpg', self.var.ROIHSV)
+            # cv2.imwrite('./img/ROIredscene.jpg', self.var.scene)
+            # cv2.imwrite('./img/ROIredresult.jpg', red)
+            # cv2.imwrite('./img/ROIredMasklow.jpg', red_low_mask)
+            # cv2.imwrite('./img/ROIredMaskhigh.jpg', red_high_mask)
 
             prefix = './img/detectLanes/lane'
             self.detect_count += 1
@@ -481,16 +487,27 @@ class LaneDetector (threading.Thread):
             detected_lanes_filename = "{}{}{}".format(prefix, midfix, suffix)
             cv2.imwrite(detected_lanes_filename, detected_lanes)
 
-            prefix = './img/detectLanes/ROI'
+            # prefix = './img/detectLanes/ROI'
+            # suffix = ".jpg"
+            # detected_ROI_filename = "{}{}{}".format(prefix, midfix, suffix)
+            # cv2.imwrite(detected_ROI_filename, self.var.ROI)
+
+            prefix = './img/detectLanes/scene'
             suffix = ".jpg"
-            detected_ROI_filename = "{}{}{}".format(prefix, midfix, suffix)
-            cv2.imwrite(detected_ROI_filename, self.var.ROI)
+            detected_scene_filename = "{}{}{}".format(prefix, midfix, suffix)
+            cv2.imwrite(detected_scene_filename, self.var.sceneROIMarked)
 
     def run(self):
+        count = 0
         while True:
-            sleep(0.5)
+            # sleep(0.1)
             try:
+                self.var.eventCameraCaptured.wait()
+                count += 1
+                # print('lane count: ', count, ' .... ', end=' ')
                 self.detectLanes()
+                # self.var.eventLaneDetected.set()
+                # self.var.eventLaneDetected.clear()
                 # self.printROI()
                 # ROIExists = self.updateROI()
                 # while not ROIExists:
@@ -499,6 +516,7 @@ class LaneDetector (threading.Thread):
                 #     ROIExists = self.updateROI()
                 # self.markROIinScene()
                 # print("detectLane() ", type(self.ROIMarked), self.ROIMarked.shape)
+                # print('lane done')
                 pass
             except TypeError:
                 print("TypeError - CameraHandler()")
@@ -522,6 +540,7 @@ class RobotDriver(threading.Thread):
         self.cm_per_tick = 0.0106
 
     def driveXcm(self, x, motorSpeedLeft = 0.3, motorSpeedRight = 0.3):
+        self.var.goalX = x
         requiredTicks = self.calculateTicksForXCm(x)
         print("required Ticks:{}".format(requiredTicks))
         # sleep(2)
@@ -554,7 +573,7 @@ class RobotDriver(threading.Thread):
     def run(self):
         print('RobotDriver started!!!')
         try:
-            self.driveXcm(15,0.3,0.33)
+            self.driveXcm(50,0.3,0.33)
             # self.driveXcm(20,-0.3,-0.33)
             # self.printROI()
             # ROIExists = self.updateROI()
@@ -574,60 +593,78 @@ class PIDController(threading.Thread):
         super().__init__()
         self.khani = khani
         self.var = var
-
         self.printInfo = printInfo
-        self.printcount = 0
-    def updatePos(self):
 
-        # print(self.var.tickLeft, self.var.tickRight, self.var.cm_per_tick, self.var.wheelBase)
-        self.var.deltaXLeft = (self.var.tickLeft - self.var.tickLeftLast) * self.var.cm_per_tick
-        self.var.deltaXRight = (self.var.tickRight - self.var.tickRightLast) * self.var.cm_per_tick
-        # print(self.var.deltaX, self.var.deltaY, self.var.deltaTheta)
-        self.var.deltaX = (self.var.deltaXLeft + self.var.deltaXRight) / 2.0
-        self.var.deltaTheta = math.atan2((self.var.deltaXRight - self.var.deltaXLeft) / 2.0, self.var.wheelBase / 2.0)
-        self.var.displacementX += self.var.deltaXLeft
+    def updatePos(self):
+        self.var.deltaSLeft = (self.var.tickLeft - self.var.tickLeftLast) * self.var.cm_per_tick
+        self.var.deltaSRight = (self.var.tickRight - self.var.tickRightLast) * self.var.cm_per_tick
+        self.var.deltaS = (self.var.deltaSLeft + self.var.deltaSRight) / 2.0
+        self.var.deltaThetaRadian = math.atan2((self.var.deltaSRight - self.var.deltaSLeft) / 2.0, self.var.wheelBase / 2.0)
+        self.var.deltaThetaDegree = (180.0 / math.pi) * self.var.deltaThetaRadian
+        self.var.thetaDotAct = self.var.deltaThetaDegree / self.var.deltaT
+        self.var.deltaX = self.var.deltaS * math.cos(self.var.deltaThetaDegree)
+        self.var.deltaY = self.var.deltaS * math.sin(self.var.deltaThetaDegree)
+        self.var.displacementX += self.var.deltaX
         self.var.displacementY += self.var.deltaY
-        self.var.displacementTheta += self.var.deltaTheta
-        # print(self.var.displacementX, self.var.displacementX, self.var.displacementTheta)
+        self.var.displacementThetaRadian += self.var.deltaThetaRadian
+        self.var.displacementThetaDegree += self.var.deltaThetaDegree
 
     def printPos(self):
         # print('Tick - current:{},{}  last:{},{}'.format(self.var.tickLeft, self.var.tickRight, \
         #                                                 self.var.tickLeftLast, self.var.tickRightLast))
-        print('delta(x/y/Th):{:.2f},{:.2f},{:.2f}  displace:{:.2f},{:.2f},{:.2f}  tick:{},{} ticklast:{},{}'.format(\
-            self.var.deltaX, self.var.deltaY, self.var.deltaTheta, \
-            self.var.displacementX, self.var.displacementY, self.var.displacementTheta, \
-            self.var.tickLeft, self.var.tickRight, self.var.tickLeftLast, self.var.tickRightLast))
+        print('delta(x/y/Th):{:+.2f},{:+.2f},{:+.2f}  displace:{:+.2f},{:+.2f},{:+.2f}  timeLast:{:.2f},Now:{:.2f},deltaT:{:.2f}'.format(\
+            self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, \
+            self.var.displacementX, self.var.displacementY, self.var.displacementThetaDegree, \
+            self.var.tickAtTimeTLast, self.var.tickAtTimeT, self.var.deltaT))
+        print('theta_dot:{:.3f}'.format(self.var.thetaDotAct))
+        # print('delta(x/y/Th):{:0>2d+.2f},{:0>2d+.2f},{:0>2d+.2f}  displace:{:0>2d+.2f},{:0>2d+.2f},{:0>2d+.2f}  tick:{},{} ticklast:{},{}'.format(\
+        #     self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, \
+        #     self.var.displacementX, self.var.displacementY, self.var.displacementThetaDegree, \
+        #     self.var.tickLeft, self.var.tickRight, self.var.tickLeftLast, self.var.tickRightLast))
 
     def getErrors(self):
-        pass
+        # PID Controller
+        self.kP = 1.0
+        self.eP = 1.0
+        self.kD = 1.0
+        self.eD = 1.0
+        self.kI = 1.0
+        self.eI = 1.0
+        self.goalX = 0.0
+        self.goalY = 0.0
+        self.goalTheta = 0.0
+        self.currX = 0.0
+        self.currY = 0.0
+        self.currTheta = 0.0
+
+        self.var.eP = self.var.goalX - self.var.displacementX
+        # print('eP:{}'.format(self.var.eP))
+
+    # def calculatePWN(self):
+    #
 
     def run(self):
         while True:
-            # self.updatePos()
             # sleep(0.05)
-            self.printcount += 1
             try:
-                # self.var.lock.acquire()
-                print('wait for the event()...', end=' ')
+                # Wait until the event of serial reading done
                 self.var.eventSerialRead.wait()
-                print('..... event() in PID set')
+
+                # Read ticks and last ticks
                 ticks = self.var.tickDeque.pop()
+                (self.var.tickLeft, self.var.tickRight) = ticks
                 ticksLast = self.var.tickDeque.pop()
-                print('self.printcount', self.printcount)
-                # ticksLast = self.var.tickLastQueue.get()
-                # ticks = self.var.tickQueue.get()
-                if ticks is not None:
-                    # print('tick', self.var.tickDeque.qsize(), ticks)
-                    print('tick', ticks)
-                if ticksLast is not None:
-                    # print('ticklast', self.var.tickLastDeque.qsize(), ticksLast)
-                    print('ticklast', ticksLast)
-                    # self.updatePos()
-                    # if self.printInfo:
-                    #     self.printPos()
-                # self.var.lock.release()
+                (self.var.tickLeftLast, self.var.tickRightLast) = ticksLast
+
+                self.updatePos()
+                self.getErrors()
+
+                if self.printInfo:
+                    self.printPos()
+
+                # Notify threads that ticks in Deque are consumed
                 self.var.eventConsumeTicks.set()
                 self.var.eventConsumeTicks.clear()
             except IndexError:
+                print("Error - PIDController()")
                 pass
-                # print("Error - PIDController()")
