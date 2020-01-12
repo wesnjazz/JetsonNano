@@ -140,7 +140,7 @@ class Var:
         # PID Controller
         self.kPAngular = 3.0
         self.ePAngular = 0.0
-        self.kDAngular = 1.0
+        self.kDAngular = 0.0
         self.eDAngular = 0.0
         self.eDDAngular = 0.0
         self.eDDAngularToPWM = 0.0
