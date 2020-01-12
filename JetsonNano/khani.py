@@ -481,6 +481,7 @@ class LaneDetector (threading.Thread):
                 yellow_center = 0
         if not yellow_found:
             yellow_center = 0
+        self.var.ROIPointYellowAbsolute = yellow_center
         yellow_mask = cv2.inRange(self.var.ROIHSV, low_yellow, high_yellow)
         yellow = cv2.bitwise_and(self.var.ROI, self.var.ROI, mask=yellow_mask)
         yellow[:, yellow_center:yellow_center+self.var.ROIBorder, 0] = 0
@@ -490,15 +491,44 @@ class LaneDetector (threading.Thread):
         # White lane
         low_white = np.array([0, 0, 220])
         high_white = np.array([255, 100, 255])
+        white_threshold = 1000
+        white_center = center
+        white_rightmost = self.var.ROI.shape[1]
+        white_found = False
+        for new_center in range(center, white_rightmost, seg_w):
+            white_center = new_center
+            new_center_right = new_center + seg_w
+            if new_center_right >= white_rightmost:
+                new_center_right = white_rightmost
+            white_part = self.var.ROIHSV[:, new_center:new_center_right]
+            white_mask = cv2.inRange(white_part, low_white, high_white)
+            white_sum = white_mask.sum(axis=0)
+            self.var.ROIPointWhite = white_sum.argmax()
+            self.var.ROIPointWhiteAbsolute = new_center + self.var.ROIPointWhite
+            if white_sum[self.var.ROIPointWhite] > white_threshold:
+                white_center = self.var.ROIPointWhiteAbsolute
+                white_found = True
+                break
+            if white_center >= white_rightmost:
+                white_center = white_rightmost
+        if not white_found:
+            white_center = white_rightmost
+        self.var.ROIPointWhiteAbsolute = white_center
         white_mask = cv2.inRange(self.var.ROIHSV, low_white, high_white)
         white = cv2.bitwise_and(self.var.ROI, self.var.ROI, mask=white_mask)
-        white_sum = white_mask.sum(axis = 0)
-        self.var.ROIPointWhite = white_sum.argmax()
-        white_center = self.var.ROIPointWhite
-        # white[np.arange(len(white)), white_center] = 255
-        white[:, white_center:white_center+self.var.ROIBorder, 0] = 255
-        white[:, white_center:white_center+self.var.ROIBorder, 1] = 255
-        white[:, white_center:white_center+self.var.ROIBorder, 2] = 255
+        white[:, white_center-self.var.ROIBorder:white_center, 0] = 255
+        white[:, white_center-self.var.ROIBorder:white_center, 1] = 255
+        white[:, white_center-self.var.ROIBorder:white_center, 2] = 255
+
+        # white_mask = cv2.inRange(self.var.ROIHSV, low_white, high_white)
+        # white = cv2.bitwise_and(self.var.ROI, self.var.ROI, mask=white_mask)
+        # white_sum = white_mask.sum(axis = 0)
+        # self.var.ROIPointWhite = white_sum.argmax()
+        # white_center = self.var.ROIPointWhite
+        # # white[np.arange(len(white)), white_center] = 255
+        # white[:, white_center:white_center+self.var.ROIBorder, 0] = 255
+        # white[:, white_center:white_center+self.var.ROIBorder, 1] = 255
+        # white[:, white_center:white_center+self.var.ROIBorder, 2] = 255
 
         # Red color
         low_min_red = np.array([0, 100, 100])
@@ -517,7 +547,7 @@ class LaneDetector (threading.Thread):
             red[red_center:red_center+self.var.ROIBorder, :, 1] = 0
             red[red_center:red_center+self.var.ROIBorder, :, 2] = 255
 
-        self.var.centerOfLane = (self.var.ROIPointYellow + self.var.ROIPointWhite) // 2
+        self.var.centerOfLane = (self.var.ROIPointYellowAbsolute + self.var.ROIPointWhiteAbsolute) // 2
         self.var.centerOfCamera = (self.var.camWidth // 2) - self.var.ROILeft
         # self.var.centerError = self.var.centerOfCamera - self.var.centerOfLane
         self.var.centerError = self.var.centerOfLane - self.var.centerOfCamera
