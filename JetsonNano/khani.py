@@ -71,6 +71,9 @@ class Var:
         self.tickMeanLast = 0
         self.tickAtTimeT = time.time()
         self.tickAtTimeTLast = self.tickAtTimeT
+        self.goalTicksLeft = 0
+        self.goalTicksRight = 0
+        self.requiredTicks = 0
         self.deltaT = 0.0
         self.readlineDataRaw = None
         self.readlineDataDecoded = None
@@ -116,23 +119,30 @@ class Var:
         self.deltaThetaDegree = 0.0
         self.thetaDotAct = 0.0
         self.thetaDotDot = 0.0
-        self.displacementX = 0.0
-        self.displacementY = 0.0
-        self.displacementThetaRadian = 0.0
-        self.displacementThetaDegree = 0.0
+        self.xAct = 0.0
+        self.xActLast = 0.0
+        self.yAct = 0.0
+        self.yActLast = 0.0
+        self.thetaAct = 0.0
+        self.thetaActLast = 0.0
+        self.displacementThetaDegreeLast = 0.0
 
         # RobotDriver
         self.robot = None
         self.motorSpeedLeft = 0
         self.motorSpeedRight = 0
+        self.driving = False
 
         # PID Controller
-        self.kP = 1.0
-        self.eP = 1.0
-        self.kD = 1.0
-        self.eD = 1.0
-        self.kI = 1.0
-        self.eI = 1.0
+        self.kPAngular = 1.0
+        self.ePAngular = 0.0
+        self.kDAngular = 1.0
+        self.eDAngular = 0.0
+        self.eDDAngular = 0.0
+        self.eDDAngularToPWM = 0.0
+        self.PWMCoefficientAngular = 100.0
+        self.kIAngular = 1.0
+        self.eIAngular = 0.0
         self.goalX = 0.0
         self.goalY = 0.0
         self.goalTheta = 0.0
@@ -541,8 +551,8 @@ class RobotDriver(threading.Thread):
 
     def driveXcm(self, x, motorSpeedLeft = 0.3, motorSpeedRight = 0.3):
         self.var.goalX = x
-        requiredTicks = self.calculateTicksForXCm(x)
-        print("required Ticks:{}".format(requiredTicks))
+        self.var.requiredTicks = self.calculateTicksForXCm(x)
+        print("required Ticks:{}".format(self.var.requiredTicks))
         # sleep(2)
         while True:
             if self.var.robot is None:
@@ -554,12 +564,39 @@ class RobotDriver(threading.Thread):
                 break
 
         print(self.var.robot, self.var.tickLeft, self.var.tickRight)
-        goalTicksLeft = self.var.tickLeft + requiredTicks
-        goalTicksRight = self.var.tickRight + requiredTicks
+        self.var.goalTicksLeft = self.var.tickLeft + self.var.requiredTicks
+        self.var.goalTicksRight = self.var.tickRight + self.var.requiredTicks
         self.var.robot.set_motors(motorSpeedLeft, motorSpeedRight)
-        while self.var.tickLeft <= goalTicksLeft and self.var.tickRight <= goalTicksRight:
+        while self.var.tickLeft <= self.var.goalTicksLeft and self.var.tickRight <= self.var.goalTicksRight:
             pass
         self.var.robot.stop()
+
+    def prepareDriving(self, x, motorSpeedLeft = 0.3, motorSpeedRight = 0.3):
+        self.var.goalX = x
+        self.var.requiredTicks = self.calculateTicksForXCm(self.var.goalX)
+        self.var.motorSpeedLeft = motorSpeedLeft
+        self.var.motorSpeedRight = motorSpeedRight
+        print('robot, tickLeft, tickRight: ', self.var.robot, self.var.tickLeft, self.var.tickRight)
+        print("required Ticks:{}".format(self.var.requiredTicks))
+        while True:
+            if self.var.robot is None:
+                print('robot is None')
+                self.var.robot = jetbot.Robot()
+                print('robot created!')
+            else:
+                print('robot existed')
+                break
+
+    def driveByPWM(self):
+        self.var.robot.set_motors(self.var.motorSpeedLeft, self.var.motorSpeedRight)
+
+    def checkGoal(self):
+        self.var.goalTicksLeft = self.var.tickLeft + self.var.requiredTicks
+        self.var.goalTicksRight = self.var.tickRight + self.var.requiredTicks
+        if self.var.tickLeft <= self.var.goalTicksLeft and self.var.tickRight <= self.var.goalTicksRight:
+            self.var.driving = True
+
+
 
     def turnXLaps(self, counterClockwise = True):
         if counterClockwise == True:
@@ -572,21 +609,28 @@ class RobotDriver(threading.Thread):
 
     def run(self):
         print('RobotDriver started!!!')
-        try:
-            self.driveXcm(50,0.3,0.33)
-            # self.driveXcm(20,-0.3,-0.33)
-            # self.printROI()
-            # ROIExists = self.updateROI()
-            # while not ROIExists:
-            #     sleep(0.2)
-            #     print("ROI not exists")
-            #     ROIExists = self.updateROI()
-            # self.markROIinScene()
-            # print("detectLane() ", type(self.ROIMarked), self.ROIMarked.shape)
-            pass
-        except:
-            print("Error - RobotDriver()")
-
+        self.prepareDriving(15, 0.3, 0.33)
+        while True:
+            try:
+                self.driveByPWM()
+                self.checkGoal()
+                if not self.var.driving:
+                    self.var.robot.stop()
+                    break
+                # self.driveXcm(50,0.3,0.33)
+                # self.driveXcm(20,-0.3,-0.33)
+                # self.printROI()
+                # ROIExists = self.updateROI()
+                # while not ROIExists:
+                #     sleep(0.2)
+                #     print("ROI not exists")
+                #     ROIExists = self.updateROI()
+                # self.markROIinScene()
+                # print("detectLane() ", type(self.ROIMarked), self.ROIMarked.shape)
+                pass
+            except:
+                print("Error - RobotDriver()")
+        print('Goal {} reached at {}'.format(self.var.goalX, self.var.xAct))
 
 class PIDController(threading.Thread):
     def __init__(self, khani, var, printInfo=False):
@@ -604,44 +648,56 @@ class PIDController(threading.Thread):
         self.var.thetaDotAct = self.var.deltaThetaDegree / self.var.deltaT
         self.var.deltaX = self.var.deltaS * math.cos(self.var.deltaThetaDegree)
         self.var.deltaY = self.var.deltaS * math.sin(self.var.deltaThetaDegree)
-        self.var.displacementX += self.var.deltaX
-        self.var.displacementY += self.var.deltaY
-        self.var.displacementThetaRadian += self.var.deltaThetaRadian
-        self.var.displacementThetaDegree += self.var.deltaThetaDegree
+        self.var.xActLast = self.var.xAct
+        self.var.xAct += self.var.deltaX
+        self.var.yActLast = self.var.yAct
+        self.var.yAct += self.var.deltaY
+        self.var.thetaActLast = self.var.thetaAct
+        self.var.thetaAct += self.var.deltaThetaDegree
+
+    def getErrors(self):
+        # PID Controller
+        # self.kP = 1.0
+        # self.eP = 1.0
+        # self.kD = 1.0
+        # self.eD = 1.0
+        # self.kI = 1.0
+        # self.eI = 1.0
+        # self.goalX = 0.0
+        # self.goalY = 0.0
+        # self.goalTheta = 0.0
+        # self.currX = 0.0
+        # self.currY = 0.0
+        # self.currTheta = 0.0
+
+        self.var.ePAngular = self.var.thetaAct - self.var.goalTheta
+        self.var.eDAngular = (self.var.thetaAct - self.var.thetaActLast) / self.var.deltaT
+        self.var.eDDAngular = -self.var.kPAngular * self.var.ePAngular - self.var.kDAngular * self.var.eDAngular
+        self.var.eDDAngularToPWM = self.var.eDDAngular / self.var.PWMCoefficientAngular
+
+    def applyNewPWM(self):
+        self.var.motorSpeedLeft += self.var.eDDAngularToPWM
+        self.var.motorSpeedRight -= self.var.eDDAngularToPWM
 
     def printPos(self):
         # print('Tick - current:{},{}  last:{},{}'.format(self.var.tickLeft, self.var.tickRight, \
         #                                                 self.var.tickLeftLast, self.var.tickRightLast))
-        print('delta(x/y/Th):{:+.2f},{:+.2f},{:+.2f}  displace:{:+.2f},{:+.2f},{:+.2f}  timeLast:{:.2f},Now:{:.2f},deltaT:{:.2f}'.format(\
-            self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, \
-            self.var.displacementX, self.var.displacementY, self.var.displacementThetaDegree, \
-            self.var.tickAtTimeTLast, self.var.tickAtTimeT, self.var.deltaT))
-        print('theta_dot:{:.3f}'.format(self.var.thetaDotAct))
+        print('delta(x/y/Th/time):{:+.2f},{:+.2f},{:+.2f}, {:.3f}  act:{:+.2f},{:+.2f},{:+.2f} Angular eP:{:.2f} eD:{:.2f} eI:{:.2f}'.format(\
+            self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, self.var.deltaT, \
+            self.var.xAct, self.var.yAct, self.var.thetaAct, \
+            self.var.ePAngular, self.var.eDAngular, self.var.eIAngular))
+        print('Angular_eP:{:+.2f} eD:{:+.2f} eI:{:+.2f} eDD:{:+.3f} eDDAngPWM:{:+.3f}'.format(\
+            self.var.ePAngular, self.var.eDAngular, self.var.eIAngular, self.var.eDDAngular, self.var.eDDAngularToPWM), end='   ')
+        print('PWM:{:+.3f}, {:+.3f}'.format(self.var.motorSpeedLeft, self.var.motorSpeedRight))
+        # print('delta(x/y/Th):{:+.2f},{:+.2f},{:+.2f}  displace:{:+.2f},{:+.2f},{:+.2f}  timeLast:{:.2f},Now:{:.2f},deltaT:{:.2f}'.format(\
+        #     self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, \
+        #     self.var.xAct, self.var.yAct, self.var.thetaAct, \
+        #     self.var.tickAtTimeTLast, self.var.tickAtTimeT, self.var.deltaT))
+        # print('theta_dot:{:.3f}'.format(self.var.thetaDotAct))
         # print('delta(x/y/Th):{:0>2d+.2f},{:0>2d+.2f},{:0>2d+.2f}  displace:{:0>2d+.2f},{:0>2d+.2f},{:0>2d+.2f}  tick:{},{} ticklast:{},{}'.format(\
         #     self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, \
-        #     self.var.displacementX, self.var.displacementY, self.var.displacementThetaDegree, \
+        #     self.var.xAct, self.var.yAct, self.var.thetaAct, \
         #     self.var.tickLeft, self.var.tickRight, self.var.tickLeftLast, self.var.tickRightLast))
-
-    def getErrors(self):
-        # PID Controller
-        self.kP = 1.0
-        self.eP = 1.0
-        self.kD = 1.0
-        self.eD = 1.0
-        self.kI = 1.0
-        self.eI = 1.0
-        self.goalX = 0.0
-        self.goalY = 0.0
-        self.goalTheta = 0.0
-        self.currX = 0.0
-        self.currY = 0.0
-        self.currTheta = 0.0
-
-        self.var.eP = self.var.goalX - self.var.displacementX
-        # print('eP:{}'.format(self.var.eP))
-
-    # def calculatePWN(self):
-    #
 
     def run(self):
         while True:
