@@ -13,20 +13,11 @@ def main():
     try:
         KhaniJet.start()
     except (KeyboardInterrupt, SystemExit):
-        self.var.robot.stop()
+        print('Ctrl+C pressed...main')
         for i in range(len(KhaniJet.threadPool)):
             self.threadPool[i].join()
-            sys.exit()
-
-    # while True:
-        # print(KhaniJet.var.tickLeft, KhaniJet.var.tickRight)
-
-    # khani.robotDriver.driveXcm(100,0.0,0.0)
-    # khani.robotDriver.driveXcm(30,0.3,0.33)
-    # khani.robotDriver.turnXLaps()
-    # while True:
-    #     print("{},{}".format(khani.tickLeft, khani.tickRight))
-
+            self.var.robot.stop()
+        sys.exit()
 
 
 if __name__ == '__main__':

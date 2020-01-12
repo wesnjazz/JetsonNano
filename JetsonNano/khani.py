@@ -22,6 +22,7 @@ class Khani:
         self.laneDetector = LaneDetector(self ,var, printInfo=False, saveFramesToFile=False)
         self.PIDController = PIDController(self, var, printInfo=True)
         self.robotDriver = RobotDriver(self, var, printInfo=False)
+        self.rateController = RateController(self, var, threadRate=1.0, printInfo=False)
 
         self.threadPool = []
         self.tickLeft = 0
@@ -30,14 +31,24 @@ class Khani:
         self.serialCommunicator.resetTicks()
 
     def startThreads(self):
+        # try:
         self.threadPool.append(self.serialCommunicator)
         self.threadPool.append(self.cameraHandler)
         self.threadPool.append(self.laneDetector)
         self.threadPool.append(self.robotDriver)
         self.threadPool.append(self.PIDController)
+        # self.threadPool.append(self.rateController)
 
         for i in range(len(self.threadPool)):
             self.threadPool[i].start()
+
+        # except (KeyboardInterrupt, SystemExit):
+        #     print('Ctrl+C pressed...khani')
+        #     self.var.robot.stop()
+        #     for i in range(len(self.threadPool)):
+        #         self.threadPool[i].join()
+        #         self.var.robot.stop()
+        #         sys.exit()
 
         # while True:
         #     sleep(0.001)
@@ -54,6 +65,7 @@ class Khani:
 class Var:
     def __init__(self, port = '/dev/ttyACM0', baudRate = 9600):
         self.lock = None
+        self.threadRate = 0.0
 
         # SerialCommunicator
         self.port = port
@@ -65,18 +77,21 @@ class Var:
         self.eventLaneDetected = threading.Event()
         self.eventPIDCalculated = threading.Event()
         self.eventNewPWMExecuted = threading.Event()
+        self.eventRate = threading.Event()
         self.tickLeft = 0
         self.tickRight = 0
         self.tickMean = 0
         self.tickLeftLast = 0
         self.tickRightLast = 0
         self.tickMeanLast = 0
+        self.tickAtTimeBegin = time.time()
         self.tickAtTimeT = time.time()
         self.tickAtTimeTLast = self.tickAtTimeT
         self.goalTicksLeft = 0
         self.goalTicksRight = 0
         self.requiredTicks = 0
         self.deltaT = 0.0
+        self.startTime = time.time()
         self.readlineDataRaw = None
         self.readlineDataDecoded = None
         self.serialObject = None
@@ -119,7 +134,7 @@ class Var:
         self.deltaY = 0.0
         self.deltaThetaRadian = 0.0
         self.deltaThetaDegree = 0.0
-        self.thetaDotAct = 0.0
+        self.thetaActDot = 0.0
         self.thetaDotDot = 0.0
         self.xAct = 0.0
         self.xActLast = 0.0
@@ -138,13 +153,14 @@ class Var:
         self.driving = False
 
         # PID Controller
-        self.kPAngular = 3.0
+        self.kPAngular = 1.0
         self.ePAngular = 0.0
-        self.kDAngular = 0.0
+        self.kDAngular = 1.0
         self.eDAngular = 0.0
         self.eDDAngular = 0.0
         self.eDDAngularToPWM = 0.0
-        self.PWMCoefficientAngular = 300.0
+        self.PWMCoefficientAngular = 1000.0
+        # self.PWMCoefficientAngular = 200.0
         self.kIAngular = 1.0
         self.eIAngular = 0.0
         self.goalX = 0.0
@@ -154,6 +170,23 @@ class Var:
         self.currY = 0.0
         self.currTheta = 0.0
 
+class RateController (threading.Thread):
+    def __init__(self, khani, var, threadRate=0.0, printInfo=False):
+        super().__init__()
+        self.khani = khani
+        self.var = var
+        self.var.threadRate = threadRate
+        self.printInfo = printInfo
+
+    def run(self):
+        timeBegin = time.time()
+        while True:
+            print('threadRate', time.time() - timeBegin)
+            sleep(self.var.threadRate)
+            self.var.eventRate.set()
+            self.var.eventRate.clear()
+            self.var.eventSerialRead.set()
+            self.var.eventSerialRead.clear()
 
 class SerialCommunicator (threading.Thread):
     def __init__(self, khani, var, port = '/dev/ttyACM0', baudRate = 9600, printInfo=False):
@@ -204,7 +237,8 @@ class SerialCommunicator (threading.Thread):
         self.resetTicks()
         serialcount = 0
         while True:
-            sleep(0.01)
+            # sleep(0.5)
+            sleep(0.05)
             serialcount += 1
             try:
                 # print(serialcount, ' read serial.....', end=' ')
@@ -620,12 +654,13 @@ class RobotDriver(threading.Thread):
 
     def run(self):
         print('RobotDriver started!!!')
-        self.prepareDriving(50, 0.3, 0.22)
+        self.prepareDriving(50, 0.22, 0.22)
         while True:
             # sleep(0.5)
             try:
                 # self.var.eventSerialRead.wait()
-                # print('self.var.eventPIDCalculated.wait()')
+                # self.var.eventRate.wait()
+                print('self.var.eventPIDCalculated.wait()')
                 self.var.eventPIDCalculated.wait()
                 print('self.var.eventPIDCalculated.wait()  resolved')
                 # print('self.driveByPWM()')
@@ -637,7 +672,7 @@ class RobotDriver(threading.Thread):
                 if not self.var.driving:
                     self.var.robot.stop()
                     break
-                print('self.var.eventNewPWMExecuted.set()')
+                # print('self.var.eventNewPWMExecuted.set()')
                 self.var.eventNewPWMExecuted.set()
                 # print('self.var.eventNewPWMExecuted.clear()')
                 self.var.eventNewPWMExecuted.clear()
@@ -665,20 +700,53 @@ class PIDController(threading.Thread):
         self.printInfo = printInfo
 
     def updatePos(self):
+        self.var.xActLast = self.var.xAct
+        self.var.yActLast = self.var.yAct
+        self.var.thetaActLast = self.var.thetaAct
+
         self.var.deltaSLeft = (self.var.tickLeft - self.var.tickLeftLast) * self.var.cm_per_tick
         self.var.deltaSRight = (self.var.tickRight - self.var.tickRightLast) * self.var.cm_per_tick
         self.var.deltaS = (self.var.deltaSLeft + self.var.deltaSRight) / 2.0
         self.var.deltaThetaRadian = math.atan2((self.var.deltaSRight - self.var.deltaSLeft) / 2.0, self.var.wheelBase / 2.0)
         self.var.deltaThetaDegree = (180.0 / math.pi) * self.var.deltaThetaRadian
-        self.var.thetaDotAct = self.var.deltaThetaDegree / self.var.deltaT
+
         self.var.deltaX = self.var.deltaS * math.cos(self.var.deltaThetaDegree)
         self.var.deltaY = self.var.deltaS * math.sin(self.var.deltaThetaDegree)
-        self.var.xActLast = self.var.xAct
         self.var.xAct += self.var.deltaX
-        self.var.yActLast = self.var.yAct
         self.var.yAct += self.var.deltaY
-        self.var.thetaActLast = self.var.thetaAct
         self.var.thetaAct += self.var.deltaThetaDegree
+        # self.var.thetaActDot = (self.var.thetaAct - self.var.thetaActLast) / (self.var.tickAtTimeT - self.var.tickAtTimeBegin)
+        self.var.thetaActDot = (self.var.thetaAct - self.var.thetaActLast) / self.var.deltaT
+        # self.var.thetaActDot = self.var.thetaAct / self.var.deltaT
+        # self.var.thetaActDot = self.var.deltaThetaDegree / self.var.deltaT
+
+
+
+
+
+        # self.var.deltaSLeft = (self.var.tickLeft - self.var.tickLeftLast) * self.var.cm_per_tick
+        # self.var.deltaSRight = (self.var.tickRight - self.var.tickRightLast) * self.var.cm_per_tick
+        # self.var.deltaS = (self.var.deltaSLeft + self.var.deltaSRight) / 2.0
+        # self.var.deltaThetaRadian = math.atan2((self.var.deltaSRight - self.var.deltaSLeft) / 2.0, self.var.wheelBase / 2.0)
+        # self.var.deltaThetaDegree = (180.0 / math.pi) * self.var.deltaThetaRadian
+        #
+        # self.var.deltaX = self.var.deltaS * math.cos(self.var.deltaThetaDegree)
+        # self.var.deltaY = self.var.deltaS * math.sin(self.var.deltaThetaDegree)
+        # self.var.xAct += self.var.deltaX
+        # self.var.yAct += self.var.deltaY
+        # self.var.thetaAct += self.var.deltaThetaDegree
+        # self.var.thetaActDot = (self.var.thetaAct - self.var.thetaActLast) / self.var.deltaT
+        # self.var.thetaActDot = (self.var.thetaAct - self.var.thetaActLast) / self.var.deltaT
+        # self.var.thetaActDot = self.var.thetaAct / self.var.deltaT
+        # self.var.thetaActDot = self.var.deltaThetaDegree / self.var.deltaT
+
+
+        # self.var.xActLast = self.var.xAct
+        # self.var.yActLast = self.var.yAct
+        # self.var.thetaActLast = self.var.thetaAct
+
+        self.left = self.var.motorSpeedLeftInitial
+        self.right = self.var.motorSpeedRightInitial
 
     def getErrors(self):
         # PID Controller
@@ -696,24 +764,47 @@ class PIDController(threading.Thread):
         # self.currTheta = 0.0
 
         self.var.ePAngular = self.var.thetaAct - self.var.goalTheta
+        # self.var.eDAngular = (self.var.thetaAct - self.var.thetaActLast) / (time.time() - self.var.startTime)
         self.var.eDAngular = (self.var.thetaAct - self.var.thetaActLast) / self.var.deltaT
-        self.var.eDDAngular = -(self.var.kPAngular * self.var.ePAngular) - (self.var.kDAngular * self.var.eDAngular)
+        self.var.eDDAngular = -(self.var.kPAngular * self.var.ePAngular) - (self.var.kDAngular * self.var.thetaActDot)
+        # self.var.eDDAngular = -(self.var.kPAngular * self.var.ePAngular) - (self.var.kDAngular * self.var.eDAngular)
         self.var.eDDAngularToPWM = self.var.eDDAngular / self.var.PWMCoefficientAngular
 
     def applyNewPWM(self):
         # self.var.motorSpeedLeft = self.var.motorSpeedLeftInitial - self.var.eDDAngularToPWM
         # self.var.motorSpeedRight = self.var.motorSpeedRightInitial + self.var.eDDAngularToPWM
+
+        # self.left -= self.var.eDDAngularToPWM
+        # self.right += self.var.eDDAngularToPWM
+        # print('speed:{:+.3f},{:+.3f}'.format(self.left, self.right))
+
         self.var.motorSpeedLeft -= self.var.eDDAngularToPWM
         self.var.motorSpeedRight += self.var.eDDAngularToPWM
+        # self.var.motorSpeedLeft -= 0.05
+        # self.var.motorSpeedRight -= 0.05
+        if self.var.motorSpeedLeft >= 1.0:
+            self.var.motorSpeedLeft = 1.0
+        if self.var.motorSpeedRight >= 1.0:
+            self.var.motorSpeedRight = 1.0
+        if self.var.motorSpeedLeft <= 0.0:
+            self.var.motorSpeedLeft = 0.0
+        if self.var.motorSpeedRight <= 0.0:
+            self.var.motorSpeedRight = 0.0
 
     def printPos(self):
+
+        print('delta: sL {:+.3f} sR {:+.3f} sLR {:+.3f} x {:+.3f} y {:+.3f} Th {:+.3f}  \n  Act: x {:+.3f} y {:+.3f} Th {:+.3f} ThLast {:+.3f} ThActDot {:+.3f}'.format(\
+            self.var.deltaSLeft, self.var.deltaSRight, self.var.deltaS, self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, \
+            self.var.xAct, self.var.yAct, self.var.thetaAct, self.var.thetaActLast, self.var.thetaActDot), end='   ')
+
+
         # print('Tick - current:{},{}  last:{},{}'.format(self.var.tickLeft, self.var.tickRight, \
         #                                                 self.var.tickLeftLast, self.var.tickRightLast))
-        print('delta(x/y/Th/time):{:+.2f},{:+.2f},{:+.2f}, {:.3f}  act:{:+.2f},{:+.2f},{:+.2f} Angular eP:{:.2f} eD:{:.2f} eI:{:.2f}'.format(\
-            self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, self.var.deltaT, \
-            self.var.xAct, self.var.yAct, self.var.thetaAct, \
-            self.var.ePAngular, self.var.eDAngular, self.var.eIAngular))
-        print('Angular_eP:{:+.2f} eD:{:+.2f} eI:{:+.2f} eDD:{:+.3f} eDDAngPWM:{:+.3f}'.format(\
+        # print('dX {:+.2f}, dY {:+.2f}, dTh {:+.2f} dT {:.3f}   Act x {:+.2f} y {:+.2f} Th {:+.2f}   Angular eP {:.2f} eD {:.2f} eI {:.2f}'.format(\
+        #     self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, self.var.deltaT, \
+        #     self.var.xAct, self.var.yAct, self.var.thetaAct, \
+        #     self.var.ePAngular, self.var.eDAngular, self.var.eIAngular))
+        print('\nAngular eP {:+.2f} eD {:+.2f} eI {:+.2f} eDD {:+.3f} eDDAngPWM {:+.3f}'.format(\
             self.var.ePAngular, self.var.eDAngular, self.var.eIAngular, self.var.eDDAngular, self.var.eDDAngularToPWM), end='   ')
         print('PWM:{:+.3f}, {:+.3f}'.format(self.var.motorSpeedLeft, self.var.motorSpeedRight))
         print()
@@ -721,7 +812,7 @@ class PIDController(threading.Thread):
         #     self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, \
         #     self.var.xAct, self.var.yAct, self.var.thetaAct, \
         #     self.var.tickAtTimeTLast, self.var.tickAtTimeT, self.var.deltaT))
-        # print('theta_dot:{:.3f}'.format(self.var.thetaDotAct))
+        # print('theta_dot:{:.3f}'.format(self.var.thetaActDot))
         # print('delta(x/y/Th):{:0>2d+.2f},{:0>2d+.2f},{:0>2d+.2f}  displace:{:0>2d+.2f},{:0>2d+.2f},{:0>2d+.2f}  tick:{},{} ticklast:{},{}'.format(\
         #     self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, \
         #     self.var.xAct, self.var.yAct, self.var.thetaAct, \
@@ -729,12 +820,23 @@ class PIDController(threading.Thread):
 
     def run(self):
         while True:
+        # while not self.var.eventSerialRead.is_set():
             # sleep(0.05)
             try:
                 # Wait until the event of serial reading done
-                # print('self.var.eventSerialRead.wait()')
-                self.var.eventSerialRead.wait()
+                print('self.var.eventSerialRead.wait()')
+                # self.var.eventSerialRead.wait(0.01)
+                self.var.eventSerialRead.wait(1)
+                while not self.var.eventSerialRead.is_set():
+                    print('event SerialRead in not set...')
+                    self.var.eventConsumeTicks.set()
+                    self.var.eventConsumeTicks.clear()
+                    # self.var.eventPIDCalculated.set()
+                    # self.var.eventPIDCalculated.clear()
+                    # self.var.eventNewPWMExecuted.wait()
+
                 print('self.var.eventSerialRead.wait()  resolved')
+                # self.var.eventRate.wait()
 
                 # Read ticks and last ticks
                 ticks = self.var.tickDeque.pop()
@@ -757,11 +859,11 @@ class PIDController(threading.Thread):
                 self.var.eventConsumeTicks.set()
                 # print('self.var.eventConsumeTicks.clear()')
                 self.var.eventConsumeTicks.clear()
-                print('self.var.eventPIDCalculated.set()')
+                # print('self.var.eventPIDCalculated.set()')
                 self.var.eventPIDCalculated.set()
                 # print('self.var.eventPIDCalculated.clear()')
                 self.var.eventPIDCalculated.clear()
-                # print('self.var.eventNewPWMExecuted.wait()')
+                print('self.var.eventNewPWMExecuted.wait()')
                 self.var.eventNewPWMExecuted.wait()
                 print('self.var.eventNewPWMExecuted.wait()  resolved')
             except IndexError:
