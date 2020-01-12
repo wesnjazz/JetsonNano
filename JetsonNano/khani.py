@@ -161,7 +161,7 @@ class Var:
         self.driving = False
 
         # PID Controller
-        self.kPAngular = 2.0
+        self.kPAngular = 4.0
         self.ePAngular = 0.0
         self.kDAngular = 3.0
         self.eDAngular = 0.0
@@ -495,7 +495,7 @@ class LaneDetector (threading.Thread):
         white_center = center
         white_rightmost = self.var.ROI.shape[1]
         white_found = False
-        for new_center in range(center, white_rightmost, seg_w):
+        for new_center in range(center // 2, white_rightmost, seg_w):
             white_center = new_center
             new_center_right = new_center + seg_w
             if new_center_right >= white_rightmost:
