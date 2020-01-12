@@ -654,15 +654,17 @@ class RobotDriver(threading.Thread):
 
     def run(self):
         print('RobotDriver started!!!')
-        self.prepareDriving(50, 0.22, 0.22)
+        self.prepareDriving(150, 0.22, 0.22)
         while True:
             # sleep(0.5)
             try:
                 # self.var.eventSerialRead.wait()
                 # self.var.eventRate.wait()
-                print('self.var.eventPIDCalculated.wait()')
-                self.var.eventPIDCalculated.wait()
-                print('self.var.eventPIDCalculated.wait()  resolved')
+
+                # print('self.var.eventPIDCalculated.wait()')
+                # self.var.eventPIDCalculated.wait()
+                # print('self.var.eventPIDCalculated.wait()  resolved')
+
                 # print('self.driveByPWM()')
                 self.driveByPWM()
                 # print('self.checkGoal()')
@@ -673,9 +675,9 @@ class RobotDriver(threading.Thread):
                     self.var.robot.stop()
                     break
                 # print('self.var.eventNewPWMExecuted.set()')
-                self.var.eventNewPWMExecuted.set()
+                # self.var.eventNewPWMExecuted.set()
                 # print('self.var.eventNewPWMExecuted.clear()')
-                self.var.eventNewPWMExecuted.clear()
+                # self.var.eventNewPWMExecuted.clear()
 
                 # self.driveXcm(50,0.3,0.33)
                 # self.driveXcm(20,-0.3,-0.33)
@@ -819,21 +821,29 @@ class PIDController(threading.Thread):
         #     self.var.tickLeft, self.var.tickRight, self.var.tickLeftLast, self.var.tickRightLast))
 
     def run(self):
+        ct = 0
         while True:
-        # while not self.var.eventSerialRead.is_set():
+
+            # while not self.var.eventSerialRead.is_set():
             # sleep(0.05)
+            ct += 1
             try:
+                if not self.var.driving and self.var.robot is not None:
+                    self.var.robot.stop()
+                    break
+
                 # Wait until the event of serial reading done
-                print('self.var.eventSerialRead.wait()')
+                print('self.var.eventSerialRead.wait()  ---           [{}]'.format(ct))
                 # self.var.eventSerialRead.wait(0.01)
                 self.var.eventSerialRead.wait(1)
-                while not self.var.eventSerialRead.is_set():
-                    print('event SerialRead in not set...')
+                while self.var.eventSerialRead.is_set():
+                    print('\t\t\t\t\tevent SerialRead in not set...')
                     self.var.eventConsumeTicks.set()
                     self.var.eventConsumeTicks.clear()
-                    # self.var.eventPIDCalculated.set()
-                    # self.var.eventPIDCalculated.clear()
-                    # self.var.eventNewPWMExecuted.wait()
+                    self.var.eventPIDCalculated.set()
+                    self.var.eventPIDCalculated.clear()
+                    self.var.eventNewPWMExecuted.wait(1)
+                    self.var.eventSerialRead.wait(1)
 
                 print('self.var.eventSerialRead.wait()  resolved')
                 # self.var.eventRate.wait()
@@ -860,12 +870,12 @@ class PIDController(threading.Thread):
                 # print('self.var.eventConsumeTicks.clear()')
                 self.var.eventConsumeTicks.clear()
                 # print('self.var.eventPIDCalculated.set()')
-                self.var.eventPIDCalculated.set()
+                # self.var.eventPIDCalculated.set()
                 # print('self.var.eventPIDCalculated.clear()')
-                self.var.eventPIDCalculated.clear()
-                print('self.var.eventNewPWMExecuted.wait()')
-                self.var.eventNewPWMExecuted.wait()
-                print('self.var.eventNewPWMExecuted.wait()  resolved')
+                # self.var.eventPIDCalculated.clear()
+                # print('self.var.eventNewPWMExecuted.wait()')
+                # self.var.eventNewPWMExecuted.wait()
+                # print('self.var.eventNewPWMExecuted.wait()  resolved')
             except IndexError:
                 print("Error - PIDController()")
                 pass
