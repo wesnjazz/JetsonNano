@@ -459,7 +459,7 @@ class LaneDetector (threading.Thread):
         # Yellow lane
         low_yellow = np.array([20, 100, 100])
         high_yellow = np.array([30, 255, 255])
-        yellow_threshold = 1000
+        yellow_threshold = 2000
         center = self.var.ROIWidth // 2
         seg_w = 5
         yellow_found = False
@@ -474,6 +474,7 @@ class LaneDetector (threading.Thread):
             self.var.ROIPointYellow = yellow_sum.argmax()
             self.var.ROIPointYellowAbsolute = new_center_left + self.var.ROIPointYellow
             if yellow_sum[self.var.ROIPointYellow] > yellow_threshold:
+                print('yellow:', yellow_sum[self.var.ROIPointYellow])
                 yellow_center = self.var.ROIPointYellowAbsolute
                 yellow_found = True
                 break
@@ -491,7 +492,7 @@ class LaneDetector (threading.Thread):
         # White lane
         low_white = np.array([0, 0, 220])
         high_white = np.array([255, 100, 255])
-        white_threshold = 1000
+        white_threshold = 2000
         white_center = center
         white_rightmost = self.var.ROI.shape[1]
         white_found = False
@@ -506,6 +507,7 @@ class LaneDetector (threading.Thread):
             self.var.ROIPointWhite = white_sum.argmax()
             self.var.ROIPointWhiteAbsolute = new_center + self.var.ROIPointWhite
             if white_sum[self.var.ROIPointWhite] > white_threshold:
+                print('white:', white_sum[self.var.ROIPointWhite])
                 white_center = self.var.ROIPointWhiteAbsolute
                 white_found = True
                 break
