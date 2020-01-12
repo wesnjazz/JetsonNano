@@ -709,7 +709,7 @@ class RobotDriver(threading.Thread):
 
     def run(self):
         print('RobotDriver started!!!')
-        self.prepareDriving(80, 0.22, 0.22)
+        self.prepareDriving(100, 0.22, 0.22)
         while True:
             try:
                 self.driveByPWM()
