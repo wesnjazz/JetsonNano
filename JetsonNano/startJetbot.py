@@ -13,6 +13,7 @@ def main():
     try:
         KhaniJet.start()
     except (KeyboardInterrupt, SystemExit):
+        self.var.robot.stop()
         for i in range(len(KhaniJet.threadPool)):
             self.threadPool[i].join()
             sys.exit()
