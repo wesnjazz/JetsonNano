@@ -20,7 +20,7 @@ class Khani:
         print('done')
         self.serialCommunicator = SerialCommunicator(self, var, printInfo=False)
         self.laneDetector = LaneDetector(self ,var, printInfo=False, saveFramesToFile=True)
-        self.PIDController = PIDController(self, var, printInfo=True)
+        self.PIDController = PIDController(self, var, printInfo=False)
         self.robotDriver = RobotDriver(self, var, printInfo=False)
         self.rateController = RateController(self, var, threadRate=1.0, printInfo=False)
 
@@ -110,8 +110,11 @@ class Var:
         self.ROIWidth = 0
         self.ROIBorder = 0
         self.ROIPointYellow = 0
+        self.ROIPointYellowAbsolute = 0
         self.ROIPointWhite = 0
+        self.ROIPointWhiteAbsolute = 0
         self.ROIPointRed = 0
+        self.ROIPointRedAbsolute = 0
         self.centerOfLane = 0
         self.centerOfCamera = 0
         self.centerError = 0
@@ -456,11 +459,30 @@ class LaneDetector (threading.Thread):
         # Yellow lane
         low_yellow = np.array([20, 100, 100])
         high_yellow = np.array([30, 255, 255])
+        yellow_threshold = 1000
+        center = self.var.ROIWidth // 2
+        seg_w = 5
+        yellow_found = False
+        for new_center in range(center, 0, -seg_w):
+            yellow_center = new_center
+            new_center_left = new_center - seg_w
+            if new_center_left < 0:
+                new_center_left = 0
+            yellow_part = self.var.ROIHSV[:, new_center_left:new_center]
+            yellow_mask = cv2.inRange(yellow_part, low_yellow, high_yellow)
+            yellow_sum = yellow_mask.sum(axis=0)
+            self.var.ROIPointYellow = yellow_sum.argmax()
+            self.var.ROIPointYellowAbsolute = new_center_left + self.var.ROIPointYellow
+            if yellow_sum[self.var.ROIPointYellow] > yellow_threshold:
+                yellow_center = self.var.ROIPointYellowAbsolute
+                yellow_found = True
+                break
+            if yellow_center < 0:
+                yellow_center = 0
+        if not yellow_found:
+            yellow_center = 0
         yellow_mask = cv2.inRange(self.var.ROIHSV, low_yellow, high_yellow)
         yellow = cv2.bitwise_and(self.var.ROI, self.var.ROI, mask=yellow_mask)
-        yellow_sum = yellow_mask.sum(axis = 0)
-        self.var.ROIPointYellow = yellow_sum.argmax()
-        yellow_center = self.var.ROIPointYellow
         yellow[:, yellow_center:yellow_center+self.var.ROIBorder, 0] = 0
         yellow[:, yellow_center:yellow_center+self.var.ROIBorder, 1] = 255
         yellow[:, yellow_center:yellow_center+self.var.ROIBorder, 2] = 255
@@ -657,7 +679,7 @@ class RobotDriver(threading.Thread):
 
     def run(self):
         print('RobotDriver started!!!')
-        self.prepareDriving(80, 0.22, 0.22)
+        self.prepareDriving(40, 0.22, 0.22)
         while True:
             try:
                 self.driveByPWM()
