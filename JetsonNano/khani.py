@@ -153,7 +153,7 @@ class Var:
         self.driving = False
 
         # PID Controller
-        self.kPAngular = 1.0
+        self.kPAngular = 3.0
         self.ePAngular = 0.0
         self.kDAngular = 1.0
         self.eDAngular = 0.0
