@@ -13,16 +13,16 @@ import jetbot
 class Khani:
     def __init__(self, var):
         self.var = var
-        self.cameraHandler = CameraHandler(self, var, saveFramesToFile=False)
+        # self.cameraHandler = CameraHandler(self, var, saveFramesToFile=False)
         # self.cameraHandler = CameraHandlerSampleImg(self, var)
         print('Creating a Camera instance...', end=' ')
         sleep(2)
         print('done')
-        self.serialCommunicator = SerialCommunicator(self, var, printInfo=False)
-        self.laneDetector = LaneDetector(self ,var, printInfo=False, saveFramesToFile=True)
-        self.PIDController = PIDController(self, var, printInfo=False)
+        self.serialCommunicator = SerialCommunicator(self, var, printInfo=False, waitForEvent=False)
+        # self.laneDetector = LaneDetector(self ,var, printInfo=False, saveFramesToFile=False)
+        self.PIDController = PIDController(self, var, printInfo=True)
         self.robotDriver = RobotDriver(self, var, printInfo=False)
-        self.rateController = RateController(self, var, threadRate=1.0, printInfo=False)
+        # self.rateController = RateController(self, var, threadRate=1.0, printInfo=False)
 
         self.threadPool = []
         self.tickLeft = 0
@@ -33,8 +33,8 @@ class Khani:
     def startThreads(self):
         # try:
         self.threadPool.append(self.serialCommunicator)
-        self.threadPool.append(self.cameraHandler)
-        self.threadPool.append(self.laneDetector)
+        # self.threadPool.append(self.cameraHandler)
+        # self.threadPool.append(self.laneDetector)
         self.threadPool.append(self.robotDriver)
         self.threadPool.append(self.PIDController)
         # self.threadPool.append(self.rateController)
@@ -84,13 +84,15 @@ class Var:
         self.tickLeftLast = 0
         self.tickRightLast = 0
         self.tickMeanLast = 0
+        self.tickLeftDelta = 0.0
+        self.tickRightDelta = 0.0
         self.tickAtTimeBegin = time.time()
         self.tickAtTimeT = time.time()
         self.tickAtTimeTLast = self.tickAtTimeT
         self.goalTicksLeft = 0
         self.goalTicksRight = 0
         self.requiredTicks = 0
-        self.deltaT = 0.0
+        self.deltaT = 0.000001
         self.startTime = time.time()
         self.readlineDataRaw = None
         self.readlineDataDecoded = None
@@ -197,11 +199,12 @@ class RateController (threading.Thread):
             self.var.eventSerialRead.clear()
 
 class SerialCommunicator (threading.Thread):
-    def __init__(self, khani, var, port = '/dev/ttyACM0', baudRate = 9600, printInfo=False):
+    def __init__(self, khani, var, port = '/dev/ttyACM0', baudRate = 9600, printInfo=False, waitForEvent=False):
         super().__init__()
         self.khani = khani
         self.var = var
         self.printInfo = printInfo
+        self.waitForEvent = waitForEvent
 
         # open the serial port
         self.var.serialObject = serial.Serial(self.var.port, self.var.baudRate)
@@ -246,10 +249,15 @@ class SerialCommunicator (threading.Thread):
         serialcount = 0
         while True:
             # sleep(0.5)
-            sleep(0.05)
+            # sleep(0.05)
+            # sleep(0.5)
+            # sleep(1)
+            self.var.serialObject.reset_input_buffer()
+            self.var.serialObject.reset_output_buffer()
+
             serialcount += 1
             try:
-                # print(serialcount, ' read serial.....', end=' ')
+                print(serialcount, ' read serial.....', end=' ')
                 self.var.tickLeftLast = self.var.tickLeft
                 self.var.tickRightLast = self.var.tickRight
                 self.var.tickAtTimeTLast = self.var.tickAtTimeT
@@ -259,15 +267,18 @@ class SerialCommunicator (threading.Thread):
                 self.var.deltaT = self.var.tickAtTimeT - self.var.tickAtTimeTLast
 
                 self.var.tickLeft, self.var.tickRight = self.readSerial()
+                self.var.tickLeftDelta = (self.var.tickLeft - self.var.tickLeftLast) / self.var.deltaT
+                self.var.tickRightDelta = (self.var.tickRight - self.var.tickRightLast) / self.var.deltaT
                 self.var.tickMean = (self.var.tickLeft + self.var.tickRight) // 2
                 self.var.tickDeque.append((self.var.tickLeft, self.var.tickRight))
 
-                self.var.eventSerialRead.set()
-                self.var.eventSerialRead.clear()
-                self.var.eventConsumeTicks.wait()
-                # print(' set and clear', end=' ')
+                # self.var.eventSerialRead.set()
+                # self.var.eventSerialRead.clear()
+                # if self.waitForEvent:
+                #     self.var.eventConsumeTicks.wait()
+                    # print(' set and clear', end=' ')
                 if self.printInfo:
-                    print("Current:{},{} - Mean:{}   Last:{},{} - Mean:{}".format(\
+                    print("Current:{},{} - Mean:{}   Last:{},{} - Mean:{}".format( \
                         self.var.tickLeft, self.var.tickRight, self.var.tickMean, \
                         self.var.tickLeftLast, self.var.tickRightLast, self.var.tickMeanLast))
             except TypeError:
@@ -711,19 +722,22 @@ class RobotDriver(threading.Thread):
 
     def run(self):
         print('RobotDriver started!!!')
-        self.prepareDriving(100, 0.22, 0.22)
-        while True:
-            try:
-                self.driveByPWM()
-                self.checkGoal()
-                if self.printInfo:
-                    self.printDrivingInfos()
-                if not self.var.driving:
-                    self.var.robot.stop()
-                    break
-                pass
-            except:
-                print("Error - RobotDriver()")
+
+        self.driveXcm(50, 0.0, 0.0)
+        # self.driveXcm(50, 0.22, 0.24)
+        # self.prepareDriving(100, 0.22, 0.22)
+        # while True:
+        #     try:
+        #         self.driveByPWM()
+        #         self.checkGoal()
+        #         if self.printInfo:
+        #             self.printDrivingInfos()
+        #         if not self.var.driving:
+        #             self.var.robot.stop()
+        #             break
+        #         pass
+        #     except:
+        #         print("Error - RobotDriver()")
         print('Goal {} reached at {}'.format(self.var.goalX, self.var.xAct))
 
 class PIDController(threading.Thread):
@@ -788,15 +802,21 @@ class PIDController(threading.Thread):
         #     self.var.deltaSLeft, self.var.deltaSRight, self.var.deltaS, self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, \
         #     self.var.xAct, self.var.yAct, self.var.thetaAct, self.var.thetaActLast, self.var.thetaActDot), end='   ')
 
-        print('\nAngular eP {:+.2f} eD {:+.2f} eI {:+.2f} eDD {:+.3f} eDDAngPWM {:+.3f}'.format( \
-            self.var.ePAngular, self.var.eDAngular, self.var.eIAngular, self.var.eDDAngular, self.var.eDDAngularToPWM), end='   ')
-        print('PWM:{:+.3f}, {:+.3f}'.format(self.var.motorSpeedLeft, self.var.motorSpeedRight))
+        # print('\nAngular eP {:+.2f} eD {:+.2f} eI {:+.2f} eDD {:+.3f} eDDAngPWM {:+.3f}'.format( \
+        #     self.var.ePAngular, self.var.eDAngular, self.var.eIAngular, self.var.eDDAngular, self.var.eDDAngularToPWM), end='   ')
+        # print('PWM:{:+.3f}, {:+.3f}'.format(self.var.motorSpeedLeft, self.var.motorSpeedRight))
+        #
+        # print('Center Cam {:0>3d} Lane {:0>3d} Error {:0>+3d}   Theta2 x {:0>3d} y {:0>3d} Theta {:+.3f}'.format(\
+        #     self.var.centerOfCamera, self.var.centerOfLane, self.var.centerError, \
+        #     self.var.thetaToCenterLaneX, self.var.thetaToCenterLaneY, self.var.thetaToCenterLaneTheta))
 
-        print('Center Cam {:0>3d} Lane {:0>3d} Error {:0>+3d}   Theta2 x {:0>3d} y {:0>3d} Theta {:+.3f}'.format(\
-            self.var.centerOfCamera, self.var.centerOfLane, self.var.centerError, \
-            self.var.thetaToCenterLaneX, self.var.thetaToCenterLaneY, self.var.thetaToCenterLaneTheta))
-      # print('Tick - current:{},{}  last:{},{}'.format(self.var.tickLeft, self.var.tickRight, \
-        #                                                 self.var.tickLeftLast, self.var.tickRightLast))
+        # print('tick atT:{:.2f} atTLast:{:.2f} deltaT:{:.2f}  Tick - current:{},{} last:{},{} delta:{:.2f},{:.2f}   Displacement - current:{:.2f},{:.2f},{:.2f} last:{:.2f},{:.2f},{:.2f} delta:{:.2f},{:.2f},{:.2f}'.format(\
+        print('deltaT:{:.2f}  Tick - current:{},{} last:{},{} delta:{:.2f},{:.2f}   Displacement - current:{:.2f},{:.2f},{:.2f} last:{:.2f},{:.2f},{:.2f} delta:{:.2f},{:.2f},{:.2f}'.format(\
+            # self.var.tickAtTimeT, self.var.tickAtTimeTLast, self.var.deltaT, \
+            self.var.deltaT, \
+            self.var.tickLeft, self.var.tickRight, self.var.tickLeftLast, self.var.tickRightLast, self.var.tickLeftDelta, self.var.tickRightDelta, \
+            self.var.xAct, self.var.yAct, self.var.thetaAct, self.var.xActLast, self.var.yActLast, self.var.thetaActLast, \
+            self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree))
 
         # print('dX {:+.2f}, dY {:+.2f}, dTh {:+.2f} dT {:.3f}   Act x {:+.2f} y {:+.2f} Th {:+.2f}   Angular eP {:.2f} eD {:.2f} eI {:.2f}'.format(\
         #     self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, self.var.deltaT, \
@@ -812,7 +832,7 @@ class PIDController(threading.Thread):
         #     self.var.deltaX, self.var.deltaY, self.var.deltaThetaDegree, \
         #     self.var.xAct, self.var.yAct, self.var.thetaAct, \
         #     self.var.tickLeft, self.var.tickRight, self.var.tickLeftLast, self.var.tickRightLast))
-        print()
+        # print()
 
     def run(self):
         ct = 0
@@ -824,23 +844,25 @@ class PIDController(threading.Thread):
                     break
 
                 # Wait until the event of serial reading done
-                # print('self.var.eventSerialRead.wait()  ---           [{}]'.format(ct))
+                print('self.var.eventSerialRead.wait()  ---           [{}]'.format(ct))
                 # self.var.eventSerialRead.wait(0.01)
-                self.var.eventSerialRead.wait(1)
-                while self.var.eventSerialRead.is_set():
-                    print('\t\t\t\t\tevent SerialRead in not set...')
-                    self.var.eventConsumeTicks.set()
-                    self.var.eventConsumeTicks.clear()
-                    self.var.eventPIDCalculated.set()
-                    self.var.eventPIDCalculated.clear()
-                    self.var.eventNewPWMExecuted.wait(1)
-                    self.var.eventSerialRead.wait(1)
+
+                # self.var.eventSerialRead.wait(1)
+
+                # while self.var.eventSerialRead.is_set():
+                #     print('\t\t\t\t\tevent SerialRead in not set...')
+                #     self.var.eventConsumeTicks.set()
+                #     self.var.eventConsumeTicks.clear()
+                #     self.var.eventPIDCalculated.set()
+                #     self.var.eventPIDCalculated.clear()
+                #     # self.var.eventNewPWMExecuted.wait(1)
+                #     self.var.eventSerialRead.wait(1)
 
                 # Read ticks and last ticks
-                ticks = self.var.tickDeque.pop()
-                (self.var.tickLeft, self.var.tickRight) = ticks
-                ticksLast = self.var.tickDeque.pop()
-                (self.var.tickLeftLast, self.var.tickRightLast) = ticksLast
+                # ticks = self.var.tickDeque.pop()
+                # (self.var.tickLeft, self.var.tickRight) = ticks
+                # ticksLast = self.var.tickDeque.pop()
+                # (self.var.tickLeftLast, self.var.tickRightLast) = ticksLast
 
                 self.updatePos()
                 self.getErrors()
@@ -850,8 +872,10 @@ class PIDController(threading.Thread):
                     self.printPos()
 
                 # Notify threads that ticks in Deque are consumed
-                self.var.eventConsumeTicks.set()
-                self.var.eventConsumeTicks.clear()
+
+                # self.var.eventConsumeTicks.set()
+                # self.var.eventConsumeTicks.clear()
+
                 # self.var.eventPIDCalculated.set()
                 # self.var.eventPIDCalculated.clear()
                 # self.var.eventNewPWMExecuted.wait()
