@@ -16,4 +16,5 @@
 *The vehicle is set to follow only blue colored object.*  
 ![](demos/JetsonNano-following2.gif)  
 
+---
 
