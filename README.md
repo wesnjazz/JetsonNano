@@ -10,7 +10,7 @@
 - ### With PD Control. High spring gain K. (65m travel).  
 *The vehicle revocers its track to the center using PD control*  
 *With high k value, the vehicle waggles extremely at the beginning, but it finally get back to the center line successfully.*  
-*Still not in on the line because there is no Integrate control. Only Proportional + Derivative.*  
+*Still not in the center line because there is no Integrate control. Only Proportional + Derivative.*  
 ![](demos/JetsonNano-withPD02.gif)  
   
 - ### Following blue colored object  
