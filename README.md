@@ -1,12 +1,12 @@
 # JetsonNano
 
 #
-![](demos/jetson-withoutPD.gif)  
+![](demos/JetsonNano-withoutPD.gif)  
   
 #
-![](demos/jetson-withPD.gif)  
+![](demos/JetsonNano-withPD.gif)  
   
 #
-![](demos/jetson-following2.gif)  
+![](demos/JetsonNano-following2.gif)  
 
 
