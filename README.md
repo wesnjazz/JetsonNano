@@ -17,4 +17,10 @@
 ![](demos/JetsonNano-following2.gif)  
 
 ---
+  
+  - ## Arduino  
+![Additional Arduino Board](demps/arduino.jpg)  
+  
+  - ## Wheel Encoder  
+![Additional Wheel Encoder](demps/wheelEncoder.jpg)  
 
