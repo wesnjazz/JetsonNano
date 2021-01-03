@@ -5,7 +5,7 @@
 *It does not go straight line due to physical erros,*
 *such as friction or dusts on the floor,*  
 *or slightly different shape on each wheel.*  
-![](demos/JetsonNano-withoutPD.gif)  
+![](demos/JetsonNano-withoutPD02.gif)  
   
 - ### With PD Control. High spring gain K. (65m travel).  
 *The vehicle revocers its track to the center using PD control*  
