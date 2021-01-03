@@ -4,7 +4,7 @@
 *The vehicle travels for 100 meters.*  
 *It does not go straight line due to physical erros,*
 *such as friction or dusts on the floor,*  
-*or slightly different shape on each wheel.*
+*or slightly different shape on each wheel.*  
 ![](demos/JetsonNano-withoutPD.gif)  
   
 - ### With PD Control. High spring gain K. (65m travel).  
