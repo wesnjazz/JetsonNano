@@ -19,8 +19,8 @@
 ---
   
   - ## Arduino  
-![Additional Arduino Board](demps/arduino.jpg)  
+![Additional Arduino Board](demos/arduino.jpg)  
   
   - ## Wheel Encoder  
-![Additional Wheel Encoder](demps/wheelEncoder.jpg)  
+![Additional Wheel Encoder](demos/wheelEncoder.jpg)  
 
