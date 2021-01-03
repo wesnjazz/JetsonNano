@@ -1,12 +1,12 @@
 # JetsonNano
 
-# Without Proportional Derivate Control
+## Without Proportional Derivate Control
 ![](demos/JetsonNano-withoutPD.gif)  
   
-# With PD Control
+## With PD Control
 ![](demos/JetsonNano-withPD.gif)  
   
-# Following blue colored object
+## Following blue colored object
 ![](demos/JetsonNano-following2.gif)  
 
 
