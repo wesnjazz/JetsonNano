@@ -11,7 +11,7 @@
 *With high k value, the vehicle waggles extremely at the beginning, but it finally get back to the center line successfully.*
 ![](demos/JetsonNano-withPD.gif)  
   
-- ### Following blue colored object
+- ### Following blue colored object  
 *The vehicle is set to follow only blue colored object.*
 ![](demos/JetsonNano-following2.gif)  
 
