@@ -25,5 +25,6 @@
   
   - ## Wheel Encoder  
   *DC motors with wheel encoder replaced the original motor configuration.*  
+  *Wheel encoder for the geometry of the vehicle to approximate its traveled distance.*  
 ![Additional Wheel Encoder](demos/wheelEncoder.jpg)  
 
