@@ -6,7 +6,7 @@
   
 - ### With PD Control, 65m travel, High spring gain K.
 *The vehicle revocers its track to the center using PD control*  
-*With high k value, the vehicle waggles extremely but it finally get back to the center line.*
+*With high k value, the vehicle waggles extremely at the beginning, but it finally get back to the center line successfully.*
 ![](demos/JetsonNano-withPD.gif)  
   
 - ### Following blue colored object
