@@ -19,10 +19,11 @@
 ---
   
   - ## Arduino  
-  *Arduino board was added additionally into the original Jetson Nano set-up*  
+  *Arduino board was added additionally into the original **Jetbot** configuration*  
   *for the wheel encoder and ultrasonic sensor in the future.*  
 ![Additional Arduino Board](demos/arduino.jpg)  
   
   - ## Wheel Encoder  
+  *DC motors with wheel encoder replaced the original motor configuration.*  
 ![Additional Wheel Encoder](demos/wheelEncoder.jpg)  
 
